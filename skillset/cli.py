@@ -198,27 +198,34 @@ def get_preset(name: str) -> dict | None:
 
 
 def cmd_list(args: argparse.Namespace) -> None:
-    """List installed skills."""
+    """List installed skills and saved presets."""
     global_dir = get_global_skills_dir()
     project_dir = get_project_skills_dir()
+    presets_dir = get_presets_dir()
 
     global_skills = sorted(global_dir.iterdir()) if global_dir.exists() else []
     project_skills = sorted(project_dir.iterdir()) if project_dir.exists() else []
+    saved_presets = sorted(presets_dir.glob("*.json")) if presets_dir.exists() else []
 
     if global_skills:
-        print(f"Global ({global_dir}):")
+        print(f"Global skills ({global_dir}):")
         for skill in global_skills:
             suffix = " -> " + str(skill.resolve()) if skill.is_symlink() else ""
             print(f"  {skill.name}{suffix}")
 
     if project_skills:
-        print(f"Project ({project_dir}):")
+        print(f"Project skills ({project_dir}):")
         for skill in project_skills:
             suffix = " -> " + str(skill.resolve()) if skill.is_symlink() else ""
             print(f"  {skill.name}{suffix}")
 
-    if not global_skills and not project_skills:
-        print("No skills installed")
+    if saved_presets:
+        print(f"Saved presets ({presets_dir}):")
+        for preset in saved_presets:
+            print(f"  {preset.stem}")
+
+    if not global_skills and not project_skills and not saved_presets:
+        print("No skills or presets found")
 
 
 def cmd_save(args: argparse.Namespace) -> None:
