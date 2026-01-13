@@ -1,6 +1,6 @@
 [project]
 name = "skillset"
-version = "0.0.0.dev"  # Set by CI from git tag - do not edit manually
+version = "0.0.0.dev"  # Set by CI from release - do not edit manually
 description = "Manage AI skills and permissions across different projects"
 requires-python = ">=3.11"
 dependencies = []
