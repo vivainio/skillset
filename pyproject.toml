@@ -3,10 +3,7 @@ name = "skillset"
 version = "0.1.0"
 description = "Manage AI skills and permissions across different projects"
 requires-python = ">=3.11"
-dependencies = [
-    "click",
-    "toml",
-]
+dependencies = []
 
 [project.scripts]
 skillset = "skillset.cli:main"
