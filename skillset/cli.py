@@ -169,6 +169,31 @@ def merge_permissions(repo_dir: Path, settings_path: Path) -> list[str]:
     return list(repo_perms.keys())
 
 
+def load_user_preset(name: str) -> dict | None:
+    """Load a user-saved preset by name."""
+    preset_path = get_presets_dir() / f"{name}.json"
+    if preset_path.exists():
+        return json.loads(preset_path.read_text())
+    return None
+
+
+def save_user_preset(name: str, settings: dict) -> Path:
+    """Save settings as a user preset."""
+    presets_dir = get_presets_dir()
+    presets_dir.mkdir(parents=True, exist_ok=True)
+    preset_path = presets_dir / f"{name}.json"
+    preset_path.write_text(json.dumps(settings, indent=2) + "\n")
+    return preset_path
+
+
+def get_preset(name: str) -> dict | None:
+    """Get a preset by name (checks user presets first, then builtins)."""
+    user_preset = load_user_preset(name)
+    if user_preset:
+        return user_preset
+    return BUILTIN_PRESETS.get(name)
+
+
 # Command handlers
 
 
@@ -196,6 +221,18 @@ def cmd_list(args: argparse.Namespace) -> None:
         print("No skills installed")
 
 
+def cmd_save(args: argparse.Namespace) -> None:
+    """Save current project permissions as a reusable preset."""
+    settings_path = get_project_settings_path()
+    if not settings_path.exists():
+        print(f"No settings found at {settings_path}")
+        sys.exit(1)
+
+    settings = load_settings(settings_path)
+    preset_path = save_user_preset(args.name, settings)
+    print(f"Saved preset '{args.name}' to {preset_path}")
+
+
 def cmd_apply(args: argparse.Namespace) -> None:
     """Apply permission presets (auto-detect or specific)."""
     settings_path = get_project_settings_path()
@@ -206,10 +243,10 @@ def cmd_apply(args: argparse.Namespace) -> None:
         total_perms = 0
         applied = []
         for name in args.presets:
-            if name not in BUILTIN_PRESETS:
-                print(f"Unknown preset '{name}'. Use 'skillset builtins' to list.")
+            preset = get_preset(name)
+            if not preset:
+                print(f"Unknown preset '{name}'")
                 sys.exit(1)
-            preset = BUILTIN_PRESETS[name]
             existing = deep_merge(existing, preset)
             total_perms += len(preset.get("permissions", {}).get("allow", []))
             applied.append(name)
@@ -332,6 +369,10 @@ def main() -> None:
     # list
     subparsers.add_parser("list", help="list installed skills")
 
+    # save
+    p_save = subparsers.add_parser("save", help="save project permissions as reusable preset")
+    p_save.add_argument("name", help="preset name")
+
     # apply
     p_apply = subparsers.add_parser(
         "apply", help="apply permission presets (auto-detect or specific)"
@@ -359,6 +400,7 @@ def main() -> None:
 
     handlers = {
         "list": cmd_list,
+        "save": cmd_save,
         "apply": cmd_apply,
         "add": cmd_add,
         "update": cmd_update,
