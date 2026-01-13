@@ -99,13 +99,13 @@ def link_skills(repo_dir: Path, target_dir: Path) -> list[str]:
 
 
 def get_global_settings_path() -> Path:
-    """Get global Claude settings path."""
-    return Path.home() / ".claude" / "settings.json"
+    """Get global Claude settings.local path (user preferences)."""
+    return Path.home() / ".claude" / "settings.local.json"
 
 
 def get_project_settings_path() -> Path:
-    """Get project-local Claude settings path."""
-    return Path.cwd() / ".claude" / "settings.json"
+    """Get project-local Claude settings.local path (user preferences)."""
+    return Path.cwd() / ".claude" / "settings.local.json"
 
 
 def load_settings(settings_path: Path) -> dict:
