@@ -172,12 +172,28 @@ def merge_permissions(repo_dir: Path, settings_path: Path) -> list[str]:
 # Command handlers
 
 
-def cmd_builtins(args: argparse.Namespace) -> None:
-    """List available built-in permission presets."""
-    print("Built-in presets:")
-    for name, preset in BUILTIN_PRESETS.items():
-        perms = preset.get("permissions", {}).get("allow", [])
-        print(f"  {name}: {len(perms)} permission(s)")
+def cmd_list(args: argparse.Namespace) -> None:
+    """List installed skills."""
+    global_dir = get_global_skills_dir()
+    project_dir = get_project_skills_dir()
+
+    global_skills = sorted(global_dir.iterdir()) if global_dir.exists() else []
+    project_skills = sorted(project_dir.iterdir()) if project_dir.exists() else []
+
+    if global_skills:
+        print(f"Global ({global_dir}):")
+        for skill in global_skills:
+            suffix = " -> " + str(skill.resolve()) if skill.is_symlink() else ""
+            print(f"  {skill.name}{suffix}")
+
+    if project_skills:
+        print(f"Project ({project_dir}):")
+        for skill in project_skills:
+            suffix = " -> " + str(skill.resolve()) if skill.is_symlink() else ""
+            print(f"  {skill.name}{suffix}")
+
+    if not global_skills and not project_skills:
+        print("No skills installed")
 
 
 def cmd_apply(args: argparse.Namespace) -> None:
@@ -313,8 +329,8 @@ def main() -> None:
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    # builtins
-    subparsers.add_parser("builtins", help="list built-in permission presets")
+    # list
+    subparsers.add_parser("list", help="list installed skills")
 
     # apply
     p_apply = subparsers.add_parser(
@@ -342,7 +358,7 @@ def main() -> None:
     args = parser.parse_args()
 
     handlers = {
-        "builtins": cmd_builtins,
+        "list": cmd_list,
         "apply": cmd_apply,
         "add": cmd_add,
         "update": cmd_update,
