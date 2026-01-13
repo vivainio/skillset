@@ -59,7 +59,8 @@ def get_repo_dir(owner: str, repo: str) -> Path:
 def clone_or_pull(owner: str, repo: str) -> Path:
     """Clone repo if not exists, or pull if it does. Returns repo path."""
     repo_dir = get_repo_dir(owner, repo)
-    repo_url = f"https://github.com/{owner}/{repo}.git"
+    https_url = f"https://github.com/{owner}/{repo}.git"
+    ssh_url = f"git@github.com:{owner}/{repo}.git"
 
     if repo_dir.exists():
         print(f"Updating {owner}/{repo}...")
@@ -67,21 +68,32 @@ def clone_or_pull(owner: str, repo: str) -> Path:
     else:
         print(f"Cloning {owner}/{repo}...")
         repo_dir.parent.mkdir(parents=True, exist_ok=True)
-        subprocess.run(["git", "clone", repo_url, str(repo_dir)], check=True, capture_output=True)
+        try:
+            subprocess.run(
+                ["git", "clone", https_url, str(repo_dir)], check=True, capture_output=True
+            )
+        except subprocess.CalledProcessError as e:
+            # If HTTPS fails (e.g., auth failed for private repo), try SSH
+            stderr = e.stderr.decode() if e.stderr else ""
+            if "Authentication failed" in stderr or e.returncode == 128:
+                print(f"HTTPS failed, trying SSH...")
+                subprocess.run(
+                    ["git", "clone", ssh_url, str(repo_dir)], check=True, capture_output=True
+                )
+            else:
+                raise
 
     return repo_dir
 
 
 def find_skills(repo_dir: Path) -> list[Path]:
-    """Find skill directories in a repo. A skill is a dir with a markdown file."""
+    """Find skill directories in a repo. A skill is a dir containing SKILL.md."""
     skills = []
-    for md_file in repo_dir.glob("**/*.md"):
-        if any(part.startswith(".") for part in md_file.relative_to(repo_dir).parts):
+    for skill_file in repo_dir.glob("**/SKILL.md"):
+        if any(part.startswith(".") for part in skill_file.relative_to(repo_dir).parts):
             continue
-        if md_file.parent == repo_dir and md_file.name.lower() == "readme.md":
-            continue
-        skill_dir = md_file.parent
-        if skill_dir not in skills and skill_dir != repo_dir:
+        skill_dir = skill_file.parent
+        if skill_dir not in skills:
             skills.append(skill_dir)
     return skills
 
@@ -388,6 +400,11 @@ def cmd_update(args: argparse.Namespace) -> None:
             print("No repos installed")
             return
 
+        skills_dir = get_global_skills_dir() if args.g else get_project_skills_dir()
+        settings_path = get_project_settings_path()
+        total_skills = 0
+        total_perms = 0
+
         for owner_dir in cache_dir.iterdir():
             if not owner_dir.is_dir():
                 continue
@@ -395,7 +412,12 @@ def cmd_update(args: argparse.Namespace) -> None:
                 if not repo_dir.is_dir():
                     continue
                 clone_or_pull(owner_dir.name, repo_dir.name)
-        print("All repos updated")
+                linked = link_skills(repo_dir, skills_dir)
+                total_skills += len(linked)
+                merged_keys = merge_permissions(repo_dir, settings_path)
+                total_perms += len(merged_keys)
+
+        print(f"All repos updated ({total_skills} skill(s), {total_perms} permission key(s))")
 
 
 def main() -> None:
