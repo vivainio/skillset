@@ -98,6 +98,51 @@ def link_skills(repo_dir: Path, target_dir: Path) -> list[str]:
     return linked
 
 
+def get_global_settings_path() -> Path:
+    """Get global Claude settings path."""
+    return Path.home() / ".claude" / "settings.json"
+
+
+def get_project_settings_path() -> Path:
+    """Get project-local Claude settings path."""
+    return Path.cwd() / ".claude" / "settings.json"
+
+
+def load_settings(settings_path: Path) -> dict:
+    """Load Claude settings from a path."""
+    if settings_path.exists():
+        return json.loads(settings_path.read_text())
+    return {}
+
+
+def save_settings(settings_path: Path, settings: dict) -> None:
+    """Save Claude settings to a path."""
+    settings_path.parent.mkdir(parents=True, exist_ok=True)
+    settings_path.write_text(json.dumps(settings, indent=2) + "\n")
+
+
+def find_repo_permissions(repo_dir: Path) -> dict | None:
+    """Find and load permissions file from repo root."""
+    for name in ("settings.json", "permissions.json", "claude-settings.json"):
+        path = repo_dir / name
+        if path.exists():
+            return json.loads(path.read_text())
+    return None
+
+
+def merge_permissions(repo_dir: Path, settings_path: Path) -> list[str]:
+    """Merge repo permissions into target settings. Returns list of merged keys."""
+    repo_perms = find_repo_permissions(repo_dir)
+    if not repo_perms:
+        return []
+
+    existing = load_settings(settings_path)
+    merged = deep_merge(existing, repo_perms)
+    save_settings(settings_path, merged)
+
+    return list(repo_perms.keys())
+
+
 def load_preset(name: str) -> dict | None:
     """Load a preset by name."""
     preset_path = get_presets_dir() / f"{name}.json"
@@ -251,7 +296,7 @@ def delete(name: str) -> None:
     help="Install to project skills (.claude/skills/)",
 )
 def add(repo: str, use_global: bool, use_project: bool) -> None:
-    """Add skills from a GitHub repo (e.g., 'skillset add vivainio/agent-skills')."""
+    """Add skills and permissions from a GitHub repo."""
     if use_global and use_project:
         raise click.ClickException("Cannot use both --global and --project")
     if not use_global and not use_project:
@@ -260,15 +305,26 @@ def add(repo: str, use_global: bool, use_project: bool) -> None:
     owner, repo_name = parse_repo_spec(repo)
     repo_dir = clone_or_pull(owner, repo_name)
 
-    target_dir = get_global_skills_dir() if use_global else get_project_skills_dir()
-    linked = link_skills(repo_dir, target_dir)
+    # Link skills
+    skills_dir = get_global_skills_dir() if use_global else get_project_skills_dir()
+    linked = link_skills(repo_dir, skills_dir)
 
     if linked:
-        click.echo(f"Linked {len(linked)} skill(s) to {target_dir}:")
-        for name in sorted(linked):
-            click.echo(f"  - {name}")
-    else:
-        click.echo("No skills found in repo")
+        click.echo(f"Linked {len(linked)} skill(s) to {skills_dir}:")
+        for skill_name in sorted(linked):
+            click.echo(f"  - {skill_name}")
+
+    # Merge permissions
+    settings_path = get_global_settings_path() if use_global else get_project_settings_path()
+    merged_keys = merge_permissions(repo_dir, settings_path)
+
+    if merged_keys:
+        click.echo(f"Merged permissions into {settings_path}:")
+        for key in sorted(merged_keys):
+            click.echo(f"  - {key}")
+
+    if not linked and not merged_keys:
+        click.echo("No skills or permissions found in repo")
 
 
 @main.command()
@@ -276,7 +332,7 @@ def add(repo: str, use_global: bool, use_project: bool) -> None:
 @click.option("--global", "-g", "use_global", is_flag=True, help="Update global skills")
 @click.option("--project", "-p", "use_project", is_flag=True, help="Update project skills")
 def update(repo: str | None, use_global: bool, use_project: bool) -> None:
-    """Update repo(s) and refresh symlinks."""
+    """Update repo(s) and refresh symlinks and permissions."""
     cache_dir = get_cache_dir()
 
     if repo:
@@ -291,9 +347,17 @@ def update(repo: str | None, use_global: bool, use_project: bool) -> None:
             click.echo(f"Repo {repo} not installed. Use 'skillset add {repo}' first.")
             return
         clone_or_pull(owner, repo_name)
-        target_dir = get_global_skills_dir() if use_global else get_project_skills_dir()
-        linked = link_skills(repo_dir, target_dir)
+
+        # Refresh skills
+        skills_dir = get_global_skills_dir() if use_global else get_project_skills_dir()
+        linked = link_skills(repo_dir, skills_dir)
         click.echo(f"Updated {len(linked)} skill(s)")
+
+        # Refresh permissions
+        settings_path = get_global_settings_path() if use_global else get_project_settings_path()
+        merged_keys = merge_permissions(repo_dir, settings_path)
+        if merged_keys:
+            click.echo(f"Refreshed {len(merged_keys)} permission key(s)")
     else:
         # Update all cached repos (git pull only)
         if not cache_dir.exists():
@@ -309,7 +373,7 @@ def update(repo: str | None, use_global: bool, use_project: bool) -> None:
                 owner = owner_dir.name
                 repo_name = repo_dir.name
                 clone_or_pull(owner, repo_name)
-        click.echo("All repos updated")
+        click.echo("All repos updated (use --global/-g or --project/-p to refresh links)")
 
 
 def deep_merge(base: dict, override: dict) -> dict:
