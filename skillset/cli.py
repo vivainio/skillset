@@ -180,30 +180,33 @@ def cmd_builtins(args: argparse.Namespace) -> None:
         print(f"  {name}: {len(perms)} permission(s)")
 
 
-def cmd_use(args: argparse.Namespace) -> None:
-    """Apply a built-in permission preset."""
-    if args.name not in BUILTIN_PRESETS:
-        print(f"Unknown preset '{args.name}'. Use 'skillset builtins' to see available presets.")
-        sys.exit(1)
-
-    preset = BUILTIN_PRESETS[args.name]
-    settings_path = get_global_settings_path() if args.g else get_project_settings_path()
-
-    existing = load_settings(settings_path)
-    merged = deep_merge(existing, preset)
-    save_settings(settings_path, merged)
-
-    perms = preset.get("permissions", {}).get("allow", [])
-    print(f"Applied '{args.name}' preset ({len(perms)} permissions) to {settings_path}")
-
-
 def cmd_apply(args: argparse.Namespace) -> None:
-    """Auto-detect project type and apply appropriate presets."""
+    """Apply permission presets (auto-detect or specific)."""
+    settings_path = get_project_settings_path()
+
+    # Specific preset(s) given
+    if args.presets:
+        existing = load_settings(settings_path)
+        total_perms = 0
+        applied = []
+        for name in args.presets:
+            if name not in BUILTIN_PRESETS:
+                print(f"Unknown preset '{name}'. Use 'skillset builtins' to list.")
+                sys.exit(1)
+            preset = BUILTIN_PRESETS[name]
+            existing = deep_merge(existing, preset)
+            total_perms += len(preset.get("permissions", {}).get("allow", []))
+            applied.append(name)
+        save_settings(settings_path, existing)
+        print(f"Applied {', '.join(applied)} ({total_perms} permissions) to {settings_path}")
+        return
+
+    # Auto-detect
     project_dir = Path.cwd()
     detected = detect_project_types(project_dir)
 
     if not detected:
-        print("No project types detected. Use 'skillset use <preset>' to apply manually.")
+        print("No project types detected. Use 'skillset apply <preset> -p' to apply manually.")
         return
 
     print(f"Detected: {', '.join(detected)}")
@@ -216,9 +219,7 @@ def cmd_apply(args: argparse.Namespace) -> None:
                 print(f"  {name}: {len(perms)} permission(s)")
         return
 
-    settings_path = get_global_settings_path() if args.g else get_project_settings_path()
     existing = load_settings(settings_path)
-
     total_perms = 0
     for name in detected:
         if name in BUILTIN_PRESETS:
@@ -240,7 +241,7 @@ def cmd_add(args: argparse.Namespace) -> None:
 
     repo_dir = clone_or_pull(owner, repo_name)
 
-    # Link skills
+    # Link skills (global or project)
     skills_dir = get_global_skills_dir() if args.g else get_project_skills_dir()
     linked = link_skills(repo_dir, skills_dir)
 
@@ -249,8 +250,8 @@ def cmd_add(args: argparse.Namespace) -> None:
         for skill_name in sorted(linked):
             print(f"  - {skill_name}")
 
-    # Merge permissions
-    settings_path = get_global_settings_path() if args.g else get_project_settings_path()
+    # Merge permissions (always project)
+    settings_path = get_project_settings_path()
     merged_keys = merge_permissions(repo_dir, settings_path)
 
     if merged_keys:
@@ -279,11 +280,14 @@ def cmd_update(args: argparse.Namespace) -> None:
             sys.exit(1)
 
         clone_or_pull(owner, repo_name)
+
+        # Refresh skills (global or project)
         skills_dir = get_global_skills_dir() if args.g else get_project_skills_dir()
         linked = link_skills(repo_dir, skills_dir)
         print(f"Updated {len(linked)} skill(s)")
 
-        settings_path = get_global_settings_path() if args.g else get_project_settings_path()
+        # Refresh permissions (always project)
+        settings_path = get_project_settings_path()
         merged_keys = merge_permissions(repo_dir, settings_path)
         if merged_keys:
             print(f"Refreshed {len(merged_keys)} permission key(s)")
@@ -299,18 +303,7 @@ def cmd_update(args: argparse.Namespace) -> None:
                 if not repo_dir.is_dir():
                     continue
                 clone_or_pull(owner_dir.name, repo_dir.name)
-        print("All repos updated (use -g or -p to refresh links)")
-
-
-def add_target_args(parser: argparse.ArgumentParser) -> None:
-    """Add mutually exclusive -g/--global and -p/--project arguments."""
-    group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument(
-        "-g", "--global", dest="g", action="store_true", help="target global settings"
-    )
-    group.add_argument(
-        "-p", "--project", dest="p", action="store_true", help="target project settings"
-    )
+        print("All repos updated")
 
 
 def main() -> None:
@@ -323,37 +316,33 @@ def main() -> None:
     # builtins
     subparsers.add_parser("builtins", help="list built-in permission presets")
 
-    # use
-    p_use = subparsers.add_parser("use", help="apply a built-in permission preset")
-    p_use.add_argument("name", help="preset name (e.g., developer, python, node)")
-    add_target_args(p_use)
-
     # apply
-    p_apply = subparsers.add_parser("apply", help="auto-detect project type and apply presets")
+    p_apply = subparsers.add_parser(
+        "apply", help="apply permission presets (auto-detect or specific)"
+    )
+    p_apply.add_argument(
+        "presets", nargs="*", help="preset name(s) to apply (auto-detect if omitted)"
+    )
     p_apply.add_argument("--dry-run", action="store_true", help="show what would be applied")
-    add_target_args(p_apply)
 
     # add
     p_add = subparsers.add_parser("add", help="add skills from a GitHub repo")
     p_add.add_argument("repo", help="repo in owner/repo format")
-    add_target_args(p_add)
+    p_add.add_argument(
+        "-g", "--global", dest="g", action="store_true", help="install skills globally"
+    )
 
     # update
     p_update = subparsers.add_parser("update", help="update repo(s) and refresh links")
     p_update.add_argument("repo", nargs="?", help="specific repo to update (optional)")
-    group = p_update.add_mutually_exclusive_group()
-    group.add_argument(
-        "-g", "--global", dest="g", action="store_true", help="target global settings"
-    )
-    group.add_argument(
-        "-p", "--project", dest="p", action="store_true", help="target project settings"
+    p_update.add_argument(
+        "-g", "--global", dest="g", action="store_true", help="update global skills"
     )
 
     args = parser.parse_args()
 
     handlers = {
         "builtins": cmd_builtins,
-        "use": cmd_use,
         "apply": cmd_apply,
         "add": cmd_add,
         "update": cmd_update,
