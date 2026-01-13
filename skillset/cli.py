@@ -2,12 +2,14 @@
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 from skillset.builtins import PRESETS as BUILTIN_PRESETS
 
+IS_WINDOWS = sys.platform == "win32"
 CLAUDE_SETTINGS_FILE = ".claude/settings.json"
 
 
@@ -84,19 +86,49 @@ def find_skills(repo_dir: Path) -> list[Path]:
     return skills
 
 
+def create_dir_link(link_path: Path, target_path: Path) -> None:
+    """Create a directory link (junction on Windows, symlink on Unix)."""
+    if IS_WINDOWS:
+        # Use junction on Windows (no admin required)
+        subprocess.run(
+            ["cmd", "/c", "mklink", "/J", str(link_path), str(target_path)],
+            check=True,
+            capture_output=True,
+        )
+    else:
+        link_path.symlink_to(target_path)
+
+
+def is_link(path: Path) -> bool:
+    """Check if path is a symlink or junction."""
+    if IS_WINDOWS:
+        # Junctions appear as directories but have reparse points
+        return path.is_symlink() or (path.is_dir() and os.path.islink(str(path)))
+    return path.is_symlink()
+
+
+def remove_link(path: Path) -> None:
+    """Remove a symlink or junction."""
+    if IS_WINDOWS and path.is_dir():
+        # Junctions need rmdir, not unlink
+        os.rmdir(path)
+    else:
+        path.unlink()
+
+
 def link_skills(repo_dir: Path, target_dir: Path) -> list[str]:
-    """Symlink skill directories from repo to target skills dir."""
+    """Link skill directories from repo to target skills dir."""
     target_dir.mkdir(parents=True, exist_ok=True)
     linked = []
     for skill_dir in find_skills(repo_dir):
         skill_name = skill_dir.name
         link_path = target_dir / skill_name
-        if link_path.is_symlink():
-            link_path.unlink()
+        if is_link(link_path):
+            remove_link(link_path)
         elif link_path.exists():
-            print(f"  Skipping {skill_name}: already exists (not a symlink)")
+            print(f"  Skipping {skill_name}: already exists (not a link)")
             continue
-        link_path.symlink_to(skill_dir)
+        create_dir_link(link_path, skill_dir)
         linked.append(skill_name)
     return linked
 
@@ -210,13 +242,13 @@ def cmd_list(args: argparse.Namespace) -> None:
     if global_skills:
         print(f"Global skills ({global_dir}):")
         for skill in global_skills:
-            suffix = " -> " + str(skill.resolve()) if skill.is_symlink() else ""
+            suffix = " -> " + str(skill.resolve()) if is_link(skill) else ""
             print(f"  {skill.name}{suffix}")
 
     if project_skills:
         print(f"Project skills ({project_dir}):")
         for skill in project_skills:
-            suffix = " -> " + str(skill.resolve()) if skill.is_symlink() else ""
+            suffix = " -> " + str(skill.resolve()) if is_link(skill) else ""
             print(f"  {skill.name}{suffix}")
 
     if saved_presets:
