@@ -367,6 +367,23 @@ def cmd_add(args: argparse.Namespace) -> None:
         print("No skills or permissions found in repo")
 
 
+def cmd_remove(args: argparse.Namespace) -> None:
+    """Remove a skill by name."""
+    skills_dir = get_global_skills_dir() if args.g else get_project_skills_dir()
+    skill_path = skills_dir / args.name
+
+    if not skill_path.exists():
+        print(f"Skill '{args.name}' not found in {skills_dir}")
+        sys.exit(1)
+
+    if is_link(skill_path):
+        remove_link(skill_path)
+        print(f"Removed {args.name} from {skills_dir}")
+    else:
+        print(f"'{args.name}' is not a symlink - remove manually if intended")
+        sys.exit(1)
+
+
 def cmd_update(args: argparse.Namespace) -> None:
     """Update repo(s) and refresh symlinks and permissions."""
     cache_dir = get_cache_dir()
@@ -457,6 +474,13 @@ def main() -> None:
         "-g", "--global", dest="g", action="store_true", help="update global skills"
     )
 
+    # remove
+    p_remove = subparsers.add_parser("remove", help="remove a skill by name")
+    p_remove.add_argument("name", help="skill name to remove")
+    p_remove.add_argument(
+        "-g", "--global", dest="g", action="store_true", help="remove from global skills"
+    )
+
     args = parser.parse_args()
 
     handlers = {
@@ -465,6 +489,7 @@ def main() -> None:
         "apply": cmd_apply,
         "add": cmd_add,
         "update": cmd_update,
+        "remove": cmd_remove,
     }
     handlers[args.command](args)
 
