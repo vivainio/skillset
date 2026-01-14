@@ -273,8 +273,34 @@ def cmd_list(args: argparse.Namespace) -> None:
         for preset in saved_presets:
             print(f"  {preset.stem}")
 
-    if not global_skills and not project_skills and not saved_presets:
-        print("No skills or presets found")
+    # List registered repos
+    cache_dir = get_cache_dir()
+    repos = []
+    if cache_dir.exists():
+        for owner_dir in sorted(cache_dir.iterdir()):
+            if owner_dir.is_dir():
+                for repo_dir in sorted(owner_dir.iterdir()):
+                    if repo_dir.is_dir():
+                        repos.append(f"{owner_dir.name}/{repo_dir.name}")
+    if repos:
+        print(f"Repos ({cache_dir}):")
+        for repo in repos:
+            print(f"  {repo}")
+
+    # List registered local libs
+    libs_dir = get_libs_dir()
+    libs = []
+    if libs_dir.exists():
+        for lib_link in sorted(libs_dir.iterdir()):
+            if is_link(lib_link):
+                libs.append((lib_link.name, lib_link.resolve()))
+    if libs:
+        print(f"Local libs ({libs_dir}):")
+        for name, target in libs:
+            print(f"  {name} -> {target}")
+
+    if not global_skills and not project_skills and not saved_presets and not repos and not libs:
+        print("No skills, presets, repos, or libs found")
 
 
 def cmd_save(args: argparse.Namespace) -> None:
