@@ -38,6 +38,16 @@ def get_project_skills_dir() -> Path:
     return Path.cwd() / ".claude" / "skills"
 
 
+def get_global_commands_dir() -> Path:
+    """Get global Claude commands directory."""
+    return Path.home() / ".claude" / "commands"
+
+
+def get_project_commands_dir() -> Path:
+    """Get project-local Claude commands directory."""
+    return Path.cwd() / ".claude" / "commands"
+
+
 def get_global_settings_path() -> Path:
     """Get global Claude settings.local path (user preferences)."""
     return Path.home() / ".claude" / "settings.local.json"
@@ -103,6 +113,16 @@ def find_skills(repo_dir: Path) -> list[Path]:
     return skills
 
 
+def find_commands(repo_dir: Path) -> list[Path]:
+    """Find command files in a repo. Commands are .md files in commands/ directories."""
+    commands = []
+    for cmd_file in repo_dir.glob("**/commands/*.md"):
+        if any(part.startswith(".") for part in cmd_file.relative_to(repo_dir).parts):
+            continue
+        commands.append(cmd_file)
+    return commands
+
+
 def create_dir_link(link_path: Path, target_path: Path) -> None:
     """Create a directory link (junction on Windows, symlink on Unix)."""
     if IS_WINDOWS:
@@ -147,6 +167,23 @@ def link_skills(repo_dir: Path, target_dir: Path) -> list[str]:
             continue
         create_dir_link(link_path, skill_dir)
         linked.append(skill_name)
+    return linked
+
+
+def link_commands(repo_dir: Path, target_dir: Path) -> list[str]:
+    """Link command files from repo to target commands dir."""
+    target_dir.mkdir(parents=True, exist_ok=True)
+    linked = []
+    for cmd_file in find_commands(repo_dir):
+        cmd_name = cmd_file.name
+        link_path = target_dir / cmd_name
+        if link_path.is_symlink():
+            link_path.unlink()
+        elif link_path.exists():
+            print(f"  Skipping {cmd_name}: already exists (not a link)")
+            continue
+        link_path.symlink_to(cmd_file)
+        linked.append(cmd_name)
     return linked
 
 
@@ -247,26 +284,44 @@ def get_preset(name: str) -> dict | None:
 
 
 def cmd_list(args: argparse.Namespace) -> None:
-    """List installed skills and saved presets."""
-    global_dir = get_global_skills_dir()
-    project_dir = get_project_skills_dir()
+    """List installed skills, commands, and saved presets."""
+    global_skills_dir = get_global_skills_dir()
+    project_skills_dir = get_project_skills_dir()
+    global_commands_dir = get_global_commands_dir()
+    project_commands_dir = get_project_commands_dir()
     presets_dir = get_presets_dir()
 
-    global_skills = sorted(global_dir.iterdir()) if global_dir.exists() else []
-    project_skills = sorted(project_dir.iterdir()) if project_dir.exists() else []
+    global_skills = sorted(global_skills_dir.iterdir()) if global_skills_dir.exists() else []
+    project_skills = sorted(project_skills_dir.iterdir()) if project_skills_dir.exists() else []
+    global_commands = sorted(global_commands_dir.iterdir()) if global_commands_dir.exists() else []
+    project_commands = (
+        sorted(project_commands_dir.iterdir()) if project_commands_dir.exists() else []
+    )
     saved_presets = sorted(presets_dir.glob("*.json")) if presets_dir.exists() else []
 
     if global_skills:
-        print(f"Global skills ({global_dir}):")
+        print(f"Global skills ({global_skills_dir}):")
         for skill in global_skills:
             suffix = " -> " + str(skill.resolve()) if is_link(skill) else ""
             print(f"  {skill.name}{suffix}")
 
     if project_skills:
-        print(f"Project skills ({project_dir}):")
+        print(f"Project skills ({project_skills_dir}):")
         for skill in project_skills:
             suffix = " -> " + str(skill.resolve()) if is_link(skill) else ""
             print(f"  {skill.name}{suffix}")
+
+    if global_commands:
+        print(f"Global commands ({global_commands_dir}):")
+        for cmd in global_commands:
+            suffix = " -> " + str(cmd.resolve()) if cmd.is_symlink() else ""
+            print(f"  {cmd.name}{suffix}")
+
+    if project_commands:
+        print(f"Project commands ({project_commands_dir}):")
+        for cmd in project_commands:
+            suffix = " -> " + str(cmd.resolve()) if cmd.is_symlink() else ""
+            print(f"  {cmd.name}{suffix}")
 
     if saved_presets:
         print(f"Saved presets ({presets_dir}):")
@@ -299,8 +354,16 @@ def cmd_list(args: argparse.Namespace) -> None:
         for name, target in libs:
             print(f"  {name} -> {target}")
 
-    if not global_skills and not project_skills and not saved_presets and not repos and not libs:
-        print("No skills, presets, repos, or libs found")
+    if (
+        not global_skills
+        and not project_skills
+        and not global_commands
+        and not project_commands
+        and not saved_presets
+        and not repos
+        and not libs
+    ):
+        print("No skills, commands, presets, repos, or libs found")
 
 
 def cmd_save(args: argparse.Namespace) -> None:
@@ -411,14 +474,24 @@ def cmd_add(args: argparse.Namespace) -> None:
 
     # Link skills (global or project)
     skills_dir = get_global_skills_dir() if args.g else get_project_skills_dir()
-    linked = link_skills(repo_dir, skills_dir)
+    linked_skills = link_skills(repo_dir, skills_dir)
 
-    if linked:
-        print(f"Linked {len(linked)} skill(s) to {skills_dir}:")
-        for skill_name in sorted(linked):
+    if linked_skills:
+        print(f"Linked {len(linked_skills)} skill(s) to {skills_dir}:")
+        for skill_name in sorted(linked_skills):
             print(f"  - {skill_name}")
 
-        # Add read permission for skill source directory
+    # Link commands (global or project)
+    commands_dir = get_global_commands_dir() if args.g else get_project_commands_dir()
+    linked_commands = link_commands(repo_dir, commands_dir)
+
+    if linked_commands:
+        print(f"Linked {len(linked_commands)} command(s) to {commands_dir}:")
+        for cmd_name in sorted(linked_commands):
+            print(f"  - {cmd_name}")
+
+    # Add read permission for source directory if we linked anything
+    if linked_skills or linked_commands:
         settings_path = get_global_settings_path() if args.g else get_project_settings_path()
         add_read_permission(settings_path, repo_dir)
         print(f"Added Read permission for {repo_dir}")
@@ -432,7 +505,7 @@ def cmd_add(args: argparse.Namespace) -> None:
         for key in sorted(merged_keys):
             print(f"  - {key}")
 
-    if not linked and not merged_keys:
+    if not linked_skills and not linked_commands and not merged_keys:
         print("No skills or permissions found in repo")
 
 
@@ -473,8 +546,13 @@ def cmd_update(args: argparse.Namespace) -> None:
 
         # Refresh skills (global or project)
         skills_dir = get_global_skills_dir() if args.g else get_project_skills_dir()
-        linked = link_skills(repo_dir, skills_dir)
-        print(f"Updated {len(linked)} skill(s)")
+        linked_skills = link_skills(repo_dir, skills_dir)
+
+        # Refresh commands (global or project)
+        commands_dir = get_global_commands_dir() if args.g else get_project_commands_dir()
+        linked_commands = link_commands(repo_dir, commands_dir)
+
+        print(f"Updated {len(linked_skills)} skill(s), {len(linked_commands)} command(s)")
 
         # Refresh permissions (always project)
         settings_path = get_project_settings_path()
@@ -483,8 +561,10 @@ def cmd_update(args: argparse.Namespace) -> None:
             print(f"Refreshed {len(merged_keys)} permission key(s)")
     else:
         skills_dir = get_global_skills_dir() if args.g else get_project_skills_dir()
+        commands_dir = get_global_commands_dir() if args.g else get_project_commands_dir()
         settings_path = get_project_settings_path()
         total_skills = 0
+        total_commands = 0
         total_perms = 0
 
         # Update GitHub repos
@@ -496,8 +576,8 @@ def cmd_update(args: argparse.Namespace) -> None:
                     if not repo_dir.is_dir():
                         continue
                     clone_or_pull(owner_dir.name, repo_dir.name)
-                    linked = link_skills(repo_dir, skills_dir)
-                    total_skills += len(linked)
+                    total_skills += len(link_skills(repo_dir, skills_dir))
+                    total_commands += len(link_commands(repo_dir, commands_dir))
                     merged_keys = merge_permissions(repo_dir, settings_path)
                     total_perms += len(merged_keys)
 
@@ -509,15 +589,15 @@ def cmd_update(args: argparse.Namespace) -> None:
                     continue
                 lib_dir = lib_link.resolve()
                 if lib_dir.is_dir():
-                    linked = link_skills(lib_dir, skills_dir)
-                    total_skills += len(linked)
+                    total_skills += len(link_skills(lib_dir, skills_dir))
+                    total_commands += len(link_commands(lib_dir, commands_dir))
                     merged_keys = merge_permissions(lib_dir, settings_path)
                     total_perms += len(merged_keys)
 
-        if total_skills == 0 and total_perms == 0:
+        if total_skills == 0 and total_commands == 0 and total_perms == 0:
             print("No repos or libs installed")
         else:
-            print(f"Updated ({total_skills} skill(s), {total_perms} permission key(s))")
+            print(f"Updated ({total_skills} skill(s), {total_commands} command(s), {total_perms} permission key(s))")
 
 
 def main() -> None:
