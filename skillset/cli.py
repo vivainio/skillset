@@ -114,12 +114,18 @@ def find_skills(repo_dir: Path) -> list[Path]:
 
 
 def find_commands(repo_dir: Path) -> list[Path]:
-    """Find command files in a repo. Commands are .md files in commands/ directories."""
+    """Find command files in a repo. Commands are .md files in commands/ directories (nested ok)."""
     commands = []
-    for cmd_file in repo_dir.glob("**/commands/*.md"):
+    for cmd_file in repo_dir.glob("**/commands/**/*.md"):
         if any(part.startswith(".") for part in cmd_file.relative_to(repo_dir).parts):
             continue
         commands.append(cmd_file)
+    # Also check direct children of commands/
+    for cmd_file in repo_dir.glob("**/commands/*.md"):
+        if any(part.startswith(".") for part in cmd_file.relative_to(repo_dir).parts):
+            continue
+        if cmd_file not in commands:
+            commands.append(cmd_file)
     return commands
 
 
