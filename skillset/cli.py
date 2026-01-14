@@ -335,15 +335,25 @@ def cmd_apply(args: argparse.Namespace) -> None:
     print(f"Applied {len(detected)} preset(s) ({total_perms} permissions) to {settings_path}")
 
 
-def cmd_add(args: argparse.Namespace) -> None:
-    """Add skills and permissions from a GitHub repo."""
-    try:
-        owner, repo_name = parse_repo_spec(args.repo)
-    except ValueError as e:
-        print(str(e))
-        sys.exit(1)
+def is_local_path(spec: str) -> bool:
+    """Check if spec looks like a local path rather than owner/repo."""
+    return spec.startswith(("/", ".", "~"))
 
-    repo_dir = clone_or_pull(owner, repo_name)
+
+def cmd_add(args: argparse.Namespace) -> None:
+    """Add skills and permissions from a GitHub repo or local directory."""
+    if is_local_path(args.repo):
+        repo_dir = Path(args.repo).expanduser().resolve()
+        if not repo_dir.is_dir():
+            print(f"Directory not found: {repo_dir}")
+            sys.exit(1)
+    else:
+        try:
+            owner, repo_name = parse_repo_spec(args.repo)
+        except ValueError as e:
+            print(str(e))
+            sys.exit(1)
+        repo_dir = clone_or_pull(owner, repo_name)
 
     # Link skills (global or project)
     skills_dir = get_global_skills_dir() if args.g else get_project_skills_dir()
