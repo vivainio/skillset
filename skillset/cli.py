@@ -340,6 +340,16 @@ def is_local_path(spec: str) -> bool:
     return spec.startswith(("/", ".", "~"))
 
 
+def add_read_permission(settings_path: Path, target_path: Path) -> None:
+    """Add Read permission for a path to settings."""
+    perm = f"Read({target_path}/**)"
+    settings = load_settings(settings_path)
+    allow_list = settings.setdefault("permissions", {}).setdefault("allow", [])
+    if perm not in allow_list:
+        allow_list.append(perm)
+        save_settings(settings_path, settings)
+
+
 def cmd_add(args: argparse.Namespace) -> None:
     """Add skills and permissions from a GitHub repo or local directory."""
     if is_local_path(args.repo):
@@ -363,6 +373,11 @@ def cmd_add(args: argparse.Namespace) -> None:
         print(f"Linked {len(linked)} skill(s) to {skills_dir}:")
         for skill_name in sorted(linked):
             print(f"  - {skill_name}")
+
+        # Add read permission for skill source directory
+        settings_path = get_global_settings_path() if args.g else get_project_settings_path()
+        add_read_permission(settings_path, repo_dir)
+        print(f"Added Read permission for {repo_dir}")
 
     # Merge permissions (always project)
     settings_path = get_project_settings_path()
