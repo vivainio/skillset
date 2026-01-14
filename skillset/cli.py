@@ -23,6 +23,11 @@ def get_cache_dir() -> Path:
     return Path.home() / ".cache" / "skillset" / "repos"
 
 
+def get_libs_dir() -> Path:
+    """Get the directory where local skill sources are registered."""
+    return Path.home() / ".cache" / "skillset" / "libs"
+
+
 def get_global_skills_dir() -> Path:
     """Get global Claude skills directory."""
     return Path.home() / ".claude" / "skills"
@@ -350,6 +355,18 @@ def add_read_permission(settings_path: Path, target_path: Path) -> None:
         save_settings(settings_path, settings)
 
 
+def register_local_lib(repo_dir: Path) -> None:
+    """Register a local directory in libs for tracking by update."""
+    libs_dir = get_libs_dir()
+    libs_dir.mkdir(parents=True, exist_ok=True)
+    link_path = libs_dir / repo_dir.name
+    if is_link(link_path):
+        remove_link(link_path)
+    elif link_path.exists():
+        return  # Don't overwrite non-link
+    create_dir_link(link_path, repo_dir)
+
+
 def cmd_add(args: argparse.Namespace) -> None:
     """Add skills and permissions from a GitHub repo or local directory."""
     if is_local_path(args.repo):
@@ -357,6 +374,7 @@ def cmd_add(args: argparse.Namespace) -> None:
         if not repo_dir.is_dir():
             print(f"Directory not found: {repo_dir}")
             sys.exit(1)
+        register_local_lib(repo_dir)
     else:
         try:
             owner, repo_name = parse_repo_spec(args.repo)
@@ -438,28 +456,42 @@ def cmd_update(args: argparse.Namespace) -> None:
         if merged_keys:
             print(f"Refreshed {len(merged_keys)} permission key(s)")
     else:
-        if not cache_dir.exists():
-            print("No repos installed")
-            return
-
         skills_dir = get_global_skills_dir() if args.g else get_project_skills_dir()
         settings_path = get_project_settings_path()
         total_skills = 0
         total_perms = 0
 
-        for owner_dir in cache_dir.iterdir():
-            if not owner_dir.is_dir():
-                continue
-            for repo_dir in owner_dir.iterdir():
-                if not repo_dir.is_dir():
+        # Update GitHub repos
+        if cache_dir.exists():
+            for owner_dir in cache_dir.iterdir():
+                if not owner_dir.is_dir():
                     continue
-                clone_or_pull(owner_dir.name, repo_dir.name)
-                linked = link_skills(repo_dir, skills_dir)
-                total_skills += len(linked)
-                merged_keys = merge_permissions(repo_dir, settings_path)
-                total_perms += len(merged_keys)
+                for repo_dir in owner_dir.iterdir():
+                    if not repo_dir.is_dir():
+                        continue
+                    clone_or_pull(owner_dir.name, repo_dir.name)
+                    linked = link_skills(repo_dir, skills_dir)
+                    total_skills += len(linked)
+                    merged_keys = merge_permissions(repo_dir, settings_path)
+                    total_perms += len(merged_keys)
 
-        print(f"All repos updated ({total_skills} skill(s), {total_perms} permission key(s))")
+        # Update local libs (just re-link, no git pull)
+        libs_dir = get_libs_dir()
+        if libs_dir.exists():
+            for lib_link in libs_dir.iterdir():
+                if not is_link(lib_link):
+                    continue
+                lib_dir = lib_link.resolve()
+                if lib_dir.is_dir():
+                    linked = link_skills(lib_dir, skills_dir)
+                    total_skills += len(linked)
+                    merged_keys = merge_permissions(lib_dir, settings_path)
+                    total_perms += len(merged_keys)
+
+        if total_skills == 0 and total_perms == 0:
+            print("No repos or libs installed")
+        else:
+            print(f"Updated ({total_skills} skill(s), {total_perms} permission key(s))")
 
 
 def main() -> None:
