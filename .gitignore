@@ -31,3 +31,6 @@ htmlcov/
 .env
 *.pem
 *.key
+
+# Claude skills (symlinks created by skillset)
+.claude/skills/
