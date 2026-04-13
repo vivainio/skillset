@@ -124,18 +124,41 @@ def save_manifest(manifest: dict) -> None:
     path.write_text(json.dumps(manifest, indent=2) + "\n")
 
 
-def record_install(repo_key: str, *, subpath: str | None = None, copy: bool = False, scope: str = "global", trial: bool | None = None) -> None:
+def record_install(
+    repo_key: str,
+    *,
+    subpath: str | None = None,
+    copy: bool = False,
+    scope: str = "global",
+    trial: bool | None = None,
+    skills: list[str] | None = None,
+    commands: list[str] | None = None,
+    replace_items: bool = False,
+) -> None:
     """Record install options for a repo in the manifest.
 
     trial=True/False explicitly sets the flag; trial=None preserves the existing value.
+    skills/commands: names linked from this repo. By default they are merged with
+    any previously recorded list; pass replace_items=True to overwrite.
     """
     manifest = load_manifest()
     existing = manifest.get(repo_key, {})
+
+    def _merge(new_items: list[str] | None, key: str) -> list[str]:
+        prev = list(existing.get(key, []))
+        if new_items is None:
+            return prev
+        if replace_items:
+            return sorted(set(new_items))
+        return sorted(set(prev) | set(new_items))
+
     entry = {
         "subpath": subpath,
         "copy": copy,
         "scope": scope,
         "trial": existing.get("trial", False) if trial is None else trial,
+        "skills": _merge(skills, "skills"),
+        "commands": _merge(commands, "commands"),
     }
     manifest[repo_key] = entry
     save_manifest(manifest)
@@ -252,8 +275,14 @@ def create_dir_link(link_path: Path, target_path: Path) -> None:
 def is_link(path: Path) -> bool:
     """Check if path is a symlink or junction."""
     if IS_WINDOWS:
-        # Junctions appear as directories but have reparse points
-        return path.is_symlink() or (path.is_dir() and os.path.islink(str(path)))
+        # Junctions have the reparse-point attribute but don't always report as
+        # symlinks. Check st_file_attributes directly.
+        try:
+            st = path.lstat()
+        except (OSError, ValueError):
+            return False
+        FILE_ATTRIBUTE_REPARSE_POINT = 0x400
+        return bool(getattr(st, "st_file_attributes", 0) & FILE_ATTRIBUTE_REPARSE_POINT)
     return path.is_symlink()
 
 
@@ -817,6 +846,8 @@ def cmd_add(args: argparse.Namespace) -> None:
             copy=use_copy,
             scope="local" if args.local else "global",
             trial=trial_value,
+            skills=list(linked_skills),
+            commands=list(linked_commands),
         )
 
     if not linked_skills and not linked_commands and not merged_keys:
@@ -849,6 +880,40 @@ def cmd_remove(args: argparse.Namespace) -> None:
     if not args.name:
         print("Provide a skill name or use -i for interactive selection")
         sys.exit(1)
+
+    # Repo spec (owner/repo) — remove everything installed from that repo.
+    if "/" in args.name and not any(c in args.name for c in "*?["):
+        repo_key = args.name
+        opts = get_install_options(repo_key)
+        if opts is None:
+            print(f"No repo '{repo_key}' recorded in manifest")
+            sys.exit(1)
+        scope = opts.get("scope", "global")
+        skills_target = get_global_skills_dir() if scope == "global" else require_project_dir(get_project_skills_dir())
+        commands_target = get_global_commands_dir() if scope == "global" else require_project_dir(get_project_commands_dir())
+
+        removed = 0
+        for name in opts.get("skills", []):
+            p = skills_target / name
+            if p.exists() and is_managed(p):
+                remove_managed(p)
+                print(f"Removed skill {name} from {abbrev(skills_target)}")
+                removed += 1
+        for name in opts.get("commands", []):
+            p = commands_target / name
+            if p.exists() and (p.is_symlink() or p.is_file()):
+                p.unlink()
+                print(f"Removed command {name} from {abbrev(commands_target)}")
+                removed += 1
+
+        # Drop manifest entry
+        manifest = load_manifest()
+        manifest.pop(repo_key, None)
+        save_manifest(manifest)
+
+        if removed == 0:
+            print(f"No managed items from {repo_key} to remove")
+        return
 
     # Glob pattern support (e.g. "bs-*")
     if any(c in args.name for c in "*?["):
@@ -893,10 +958,111 @@ def _resolve_update_options(repo_key: str, args: argparse.Namespace) -> tuple[st
     return subpath, use_copy, scope
 
 
+def _items_pointing_at(target_dir: Path, source_dir: Path, is_file: bool = False) -> list[str]:
+    """Return names in target_dir that are managed entries resolving into source_dir.
+
+    Used to seed the manifest's per-repo skill/command list for installs that
+    predate per-repo tracking.
+    """
+    if not target_dir.exists():
+        return []
+    try:
+        src_resolved = source_dir.resolve()
+    except OSError:
+        return []
+    out: list[str] = []
+    for p in target_dir.iterdir():
+        if is_file and not (p.is_file() or p.is_symlink()):
+            continue
+        if not is_file and not (p.is_dir() or p.is_symlink()):
+            continue
+        if is_link(p):
+            try:
+                resolved = p.resolve()
+            except OSError:
+                continue
+            # For files, check parent; for dirs, check the path itself
+            check = resolved.parent if is_file else resolved
+            try:
+                check.relative_to(src_resolved)
+            except ValueError:
+                continue
+            out.append(p.name)
+        elif not is_file and is_managed_copy(p):
+            src = get_copy_source(p) or ""
+            if src and str(src_resolved) in src:
+                out.append(p.name)
+    return out
+
+
+def _update_one_repo(
+    repo_key: str,
+    source_dir: Path,
+    args: argparse.Namespace,
+) -> tuple[int, int]:
+    """Refresh skills/commands for one repo. Returns (skills, commands) counts."""
+    subpath, use_copy, scope = _resolve_update_options(repo_key, args)
+    opts = get_install_options(repo_key) or {}
+
+    skills_dir = get_global_skills_dir() if scope == "global" else require_project_dir(get_project_skills_dir())
+    commands_dir = get_global_commands_dir() if scope == "global" else require_project_dir(get_project_commands_dir())
+
+    want_new = getattr(args, "new", False)
+    cli_skills = set(args.skills) if getattr(args, "skills", None) else None
+
+    # Resolve skill filter
+    recorded_skills = opts.get("skills")
+    if recorded_skills is None and not want_new:
+        # Legacy manifest — seed from target dir by resolving managed entries
+        recorded_skills = _items_pointing_at(skills_dir, source_dir)
+        if recorded_skills:
+            print(f"  Seeded skill list for {repo_key}: {', '.join(sorted(recorded_skills))}")
+
+    if want_new:
+        skill_filter = cli_skills  # None means all
+    elif cli_skills is not None:
+        skill_filter = cli_skills
+    else:
+        skill_filter = set(recorded_skills or [])
+
+    # Commands: same treatment but no CLI filter currently
+    recorded_commands = opts.get("commands")
+    if recorded_commands is None and not want_new:
+        recorded_commands = _items_pointing_at(commands_dir, source_dir, is_file=True)
+
+    if want_new:
+        command_filter = None
+    else:
+        command_filter = set(recorded_commands or [])
+
+    # Empty filter (not None) means "nothing to refresh" — avoid linking all.
+    if skill_filter is not None and not skill_filter:
+        linked_skills: list[str] = []
+    else:
+        linked_skills = link_skills(source_dir, skills_dir, only=skill_filter, copy=use_copy)
+
+    if command_filter is not None and not command_filter:
+        linked_commands: list[str] = []
+    else:
+        linked_commands = link_commands(source_dir, commands_dir, only=command_filter, copy=use_copy)
+
+    # Refresh manifest with the items we just linked so the list stays accurate.
+    record_install(
+        repo_key,
+        subpath=subpath,
+        copy=use_copy,
+        scope=scope,
+        skills=linked_skills,
+        commands=linked_commands,
+        replace_items=want_new,
+    )
+
+    return len(linked_skills), len(linked_commands)
+
+
 def cmd_update(args: argparse.Namespace) -> None:
     """Update repo(s) and refresh links (or copies) and permissions."""
     cache_dir = get_cache_dir()
-    existing_only = not getattr(args, "new", False)
 
     if args.repo:
         try:
@@ -914,16 +1080,15 @@ def cmd_update(args: argparse.Namespace) -> None:
             clone_or_pull(owner, repo_name)
 
         repo_key = f"{owner}/{repo_name}"
-        subpath, use_copy, scope = _resolve_update_options(repo_key, args)
-        target_dir = repo_dir / subpath if subpath else repo_dir
+        subpath, _use_copy, scope = _resolve_update_options(repo_key, args)
+        if scope == "local" and get_git_root() is None:
+            print(f"Repo {repo_key} was installed with --local but you are not in a git repo")
+            sys.exit(1)
+        resolved_dir = repo_dir.resolve() if is_link(repo_dir) else repo_dir
+        source_dir = resolved_dir / subpath if subpath else resolved_dir
 
-        skills_dir = get_global_skills_dir() if scope == "global" else require_project_dir(get_project_skills_dir())
-        linked_skills = link_skills(target_dir, skills_dir, copy=use_copy, existing_only=existing_only)
-
-        commands_dir = get_global_commands_dir() if scope == "global" else require_project_dir(get_project_commands_dir())
-        linked_commands = link_commands(target_dir, commands_dir, copy=use_copy, existing_only=existing_only)
-
-        print(f"Updated {len(linked_skills)} skill(s), {len(linked_commands)} command(s)")
+        s, c = _update_one_repo(repo_key, source_dir, args)
+        print(f"Updated {s} skill(s), {c} command(s)")
     else:
         total_skills = 0
         total_commands = 0
@@ -939,16 +1104,15 @@ def cmd_update(args: argparse.Namespace) -> None:
                         clone_or_pull(owner_dir.name, repo_dir.name)
                     resolved_dir = repo_dir.resolve() if is_link(repo_dir) else repo_dir
                     repo_key = f"{owner_dir.name}/{repo_dir.name}"
-                    subpath, use_copy, scope = _resolve_update_options(repo_key, args)
+                    subpath, _use_copy, scope = _resolve_update_options(repo_key, args)
                     source_dir = resolved_dir / subpath if subpath else resolved_dir
 
                     if scope == "local" and get_git_root() is None:
                         print(f"  Skipping {repo_key} (local scope, not in a git repo)")
                         continue
-                    skills_dir = get_global_skills_dir() if scope == "global" else require_project_dir(get_project_skills_dir())
-                    commands_dir = get_global_commands_dir() if scope == "global" else require_project_dir(get_project_commands_dir())
-                    total_skills += len(link_skills(source_dir, skills_dir, copy=use_copy, existing_only=existing_only))
-                    total_commands += len(link_commands(source_dir, commands_dir, copy=use_copy, existing_only=existing_only))
+                    s, c = _update_one_repo(repo_key, source_dir, args)
+                    total_skills += s
+                    total_commands += c
 
         if total_skills == 0 and total_commands == 0:
             print("No repos installed")
@@ -1149,13 +1313,17 @@ def main() -> None:
         "--new", action="store_true",
         help="also link new skills/commands not currently linked"
     )
+    p_update.add_argument(
+        "-s", "--skill", dest="skills", metavar="SKILL", action="append",
+        help="only update the named skill (repeatable)"
+    )
 
     # clean
     subparsers.add_parser("clean", help="remove all trial skills")
 
     # remove
     p_remove = subparsers.add_parser("remove", help="remove a skill by name")
-    p_remove.add_argument("name", nargs="?", help="skill name or glob pattern (e.g. bs-*)")
+    p_remove.add_argument("name", nargs="?", help="skill name, glob (e.g. bs-*), or owner/repo")
     p_remove.add_argument(
         "-l", "--local", dest="local", action="store_true", help="remove from project skills"
     )
