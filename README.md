@@ -22,13 +22,13 @@ uv tool install . -e
 
 ## Usage
 
-By default, commands detect scope automatically: if a `skillset.toml` is found in the current directory or any parent, skills install to the project (`.claude/skills/`). Otherwise, they install globally (`~/.claude/skills/`). Use `-g` / `--global` to force global scope.
+By default, commands detect scope automatically: if a `skillset.yaml` is found in the current directory or any parent, skills install to the project (`.claude/skills/`). Otherwise, they install globally (`~/.claude/skills/`). Use `-g` / `--global` to force global scope.
 
 ### Add skills from GitHub
 
 ```bash
 skillset add vivainio/agent-skills                    # all skills from repo
-skillset add vivainio/agent-skills -g                 # force global install even if local skillset.toml file is found
+skillset add vivainio/agent-skills -g                 # force global install even if local skillset.yaml file is found
 skillset add vivainio/agent-skills -s zaira           # only the zaira skill
 skillset add vivainio/agent-skills -s zaira -s other  # multiple specific skills
 skillset add vivainio/agent-skills -p extra-skills    # skills from extra-skills/ subdirectory only
@@ -80,7 +80,7 @@ skillset add /path/to/skills-dir -s zaira        # specific skill from local dir
 skillset add zaira                               # look up by name in all sources
 ```
 
-Local paths are auto-detected and registered as editable in `skillset.toml` so `skillset sync` can find them later. When adding by skill name, all sources (editable entries and cached repos) are searched. If a skill exists in multiple sources, you'll be prompted to choose.
+Local paths are auto-detected and registered as editable in the global `skillset.yaml` so `skillset update` can find them later. When adding by skill name, all sources (editable entries and cached repos) are searched. If a skill exists in multiple sources, you'll be prompted to choose.
 
 ### Try skills temporarily
 
@@ -107,101 +107,70 @@ skillset list           # list all installed skills, commands, and cached repos
 skillset list --prune   # also remove broken links
 ```
 
-### Initialize skillset.toml
+### Initialize skillset.yaml
 
 ```bash
-skillset init           # create skillset.toml at git root (local)
-skillset init -g        # create ~/.claude/skillset.toml (global)
+skillset init           # create skillset.yaml at git root (local)
+skillset init -g        # create ~/.claude/skillset.yaml (global)
 ```
 
-### Sync (global skillset.toml)
+### Declarative config (skillset.yaml)
 
-Manage your global skills declaratively with `~/.claude/skillset.toml`:
+Manage skills declaratively in a `skillset.yaml` file — globally at `~/.claude/skillset.yaml`, or per-project at your repo root. Each entry under `skills:` is keyed by `owner/repo`:
 
-```toml
-# all skills from repo
-[skills."vivainio/agent-skills"]
-enabled = ["*"]
+```yaml
+skills:
+  # all skills from repo
+  vivainio/agent-skills:
+    enabled: ["*"]
 
-# selective: enable zaira, explicitly skip some-other
-[skills."vivainio/agent-skills"]
-enabled = ["zaira"]
-disabled = ["some-other"]
+  # selective: enable zaira, explicitly skip some-other
+  vivainio/agent-skills:
+    enabled: [zaira]
+    disabled: [some-other]
 
-# glob patterns: link everything matching a prefix, minus one
-[skills."vivainio/agent-skills"]
-enabled = ["doc-*"]
-disabled = ["doc-draft"]
+  # glob patterns: link everything matching a prefix, minus one
+  vivainio/agent-skills:
+    enabled: ["doc-*"]
+    disabled: [doc-draft]
 
-# skills from a subdirectory
-[skills."vivainio/agent-skills"]
-path = "extra-skills"
-enabled = ["*"]
+  # skills from a subdirectory
+  vivainio/agent-skills:
+    path: extra-skills
+    enabled: ["*"]
 
-# copy files instead of symlinking
-[skills."vivainio/agent-skills"]
-copy = true
-enabled = ["*"]
+  # copy files instead of symlinking
+  vivainio/agent-skills:
+    copy: true
+    enabled: ["*"]
 
-# editable: point to a local checkout instead of cache
-[skills."vivainio/agent-skills"]
-path = "extra-skills"
-editable = true
-source = "~/repos/agent-skills"
-enabled = ["*"]
+  # editable: point to a local checkout instead of the cache
+  vivainio/agent-skills:
+    path: extra-skills
+    editable: true
+    source: ~/repos/agent-skills
+    enabled: ["*"]
+
+# arbitrary cross-repo symlinks (e.g. shared specs from a sibling repo)
+links:
+  specs: ../project-docs/specs
 ```
+
+**Editable skills** point to a local checkout instead of the cache. Set `editable: true` with `source` pointing to the local path; use `path` to select a subdirectory within it.
+
+`links:` creates symlinks for cross-repo paths. Warns if a link target is not in `.gitignore`.
+
+### Update
+
+`update` applies the config: it processes `links:`, pulls each repo, links skills in `enabled`, removes those in `disabled`, and prompts for any new skills in the repo that aren't yet listed in either list. `enabled: ["*"]` links every skill (minus anything in `disabled`). Any entry containing `*`, `?`, or `[` is treated as an fnmatch glob against available skill names. Snapshot entries are skipped entirely.
 
 ```bash
-skillset sync                          # sync local skillset.toml if found, otherwise global
-skillset sync -g                       # force sync global ~/.claude/skillset.toml
-skillset sync --file path/to/skillset.toml  # sync a specific file
+skillset update                              # apply local skillset.yaml if found, otherwise global
+skillset update -g                           # apply global ~/.claude/skillset.yaml
+skillset update --file path/to/skillset.yaml # apply a specific file
+skillset update -y                           # accept all new skills without prompting
+skillset update -n                           # ignore all new skills without prompting
 ```
-
-`sync` pulls each repo, links skills in `enabled`, removes those in `disabled`, and prompts for any new skills in the repo that aren't yet listed in either list. `enabled = ["*"]` links every skill (minus anything in `disabled`). Any entry containing `*`, `?`, or `[` is treated as an fnmatch glob against available skill names.
-
-**Editable skills** point to a local checkout instead of the cache. Set `editable = true` with `source` pointing to the local path. Use `path` to select a subdirectory within it.
-
-### Apply (project skillset.toml)
-
-Declare project-scoped skills and symlinks in a `skillset.toml` file in your repo:
-
-```toml
-# all skills
-[skills."vivainio/agent-skills"]
-enabled = ["*"]
-
-# specific skills
-[skills."vivainio/agent-skills"]
-enabled = ["zaira"]
-
-# from subdirectory
-[skills."vivainio/agent-skills"]
-path = "extra-skills"
-enabled = ["*"]
-
-[links]
-"specs" = "../project-docs/specs"  # create local symlink → sibling repo path
-```
-
-```bash
-skillset apply                          # apply local skillset.toml if found, otherwise global
-skillset apply -g                       # force apply global ~/.claude/skillset.toml
-skillset apply --file path/to/skillset.toml  # apply a specific file
-```
-
-`[links]` creates symlinks for cross-repo paths (e.g. shared specs from a sibling repo). Warns if a link target is not in `.gitignore`.
-
-### Update cached repos
-
-```bash
-skillset update                              # pull all cached repos and refresh links
-skillset update vivainio/agent-skills        # update a specific repo
-skillset update --copy                       # refresh as copies instead of symlinks
-skillset update --new                        # also link new skills not previously installed
-skillset update -g                           # update global skills
-```
-
-By default, `update` only refreshes skills that are already linked. Use `--new` to also pick up new skills added to the repo since the last install.
 
 ## How it works
 

@@ -140,7 +140,7 @@ def _pin_snapshot_ref(snapshot: bool, repo_dir, ref):
 def _link_skills_for_add(source_dir, skills_dir, skills, interactive, use_copy, source_label):
     """Select and link skills. Returns (linked_skills, enabled_list, disabled_list).
 
-    enabled_list / disabled_list are what gets persisted to skillset.toml:
+    enabled_list / disabled_list are what gets persisted to skillset.yaml:
       - enabled = ["*"] means "link everything in the repo"
       - explicit lists when the user picked a subset
       - (None, None) when there were no skills to link at all

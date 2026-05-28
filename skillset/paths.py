@@ -124,7 +124,7 @@ def add_to_skillset(  # noqa: C901
     Skips silently if the file doesn't exist or the key is already registered.
     Skill selection is expressed as two lists:
       enabled: ["skill-a", "skill-b"]   # or ["*"] for all (supports globs)
-      disabled: ["skill-c"]              # explicit opt-outs (skipped by sync)
+      disabled: ["skill-c"]              # explicit opt-outs (skipped by update)
     """
     if not config_path.exists():
         return False

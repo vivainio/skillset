@@ -12,7 +12,7 @@ GLOBAL_SKILLSET_TEMPLATE = """\
 #
 #   owner/repo:
 #     enabled: [skill-a, skill-b]        # link only these
-#     disabled: [skill-c]                # explicitly skip (sync won't re-prompt)
+#     disabled: [skill-c]                # explicitly skip (update won't re-prompt)
 #
 #   owner/repo:
 #     path: subdir                       # skills live in a subdirectory
@@ -21,7 +21,7 @@ GLOBAL_SKILLSET_TEMPLATE = """\
 #     enabled: ["*"]
 #
 # Glob patterns ("doc-*", "t?st", etc.) are expanded against available skills.
-# Run 'skillset sync' to install/update skills.
+# Run 'skillset update' to install/update skills.
 
 skills: {}
 """
@@ -38,13 +38,13 @@ LOCAL_SKILLSET_TEMPLATE = """\
 #
 #   owner/repo:
 #     enabled: [skill-a, skill-b]        # link only these
-#     disabled: [skill-c]                # explicitly skip (sync won't re-prompt)
+#     disabled: [skill-c]                # explicitly skip (update won't re-prompt)
 #
 #   owner/repo:
 #     path: subdir                       # skills live in a subdirectory
 #
 # Glob patterns ("doc-*", "t?st", etc.) are expanded against available skills.
-# Run 'skillset sync' to install skills.
+# Run 'skillset update' to install skills.
 
 skills: {}
 """

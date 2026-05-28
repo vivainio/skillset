@@ -1,4 +1,4 @@
-"""Command handler for update -- yaml-driven sync of declared skills."""
+"""Command handler for update -- apply declared skills from skillset.yaml."""
 
 import os
 import subprocess

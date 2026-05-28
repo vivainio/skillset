@@ -12,16 +12,15 @@ skillset/
   commands/            Command handlers package
     __init__.py        Re-exports all cmd_* for cli.py
     _resolve.py        Source resolution helpers for add
-    _templates.py      skillset.toml templates, SYNC_META_KEYS
+    _templates.py      skillset.yaml templates
     add.py             cmd_add, cmd_init
     list.py            cmd_list
     remove.py          cmd_remove, cmd_clean
-    sync.py            cmd_sync
-    update.py          cmd_update, cmd_apply
+    update.py          cmd_update
   discovery.py         Find SKILL.md files and commands in repos
   linking.py           Symlink/junction creation, managed copies
   manifest.py          Install manifest (JSON) load/save/query
-  paths.py             Path resolution, skillset.toml updates
+  paths.py             Path resolution, skillset.yaml updates
   repo.py              Git clone/pull, GitHub URL parsing
   ui.py                Interactive prompts, fzf integration
 tests/                 Mirrors skillset/ structure per module
