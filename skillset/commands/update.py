@@ -60,6 +60,11 @@ def cmd_update(
     file_path = _resolve_toml_path(file, g)
     is_local = file_path != get_global_skillset_path()
 
+    # A local skillset.yaml is a declaration -- never prompt to amend it.
+    # New skills are just reported; --yes/--no remain explicit overrides.
+    if is_local and new == "ask":
+        new = "notify"
+
     if not file_path.exists():
         print(f"No skillset.yaml at {abbrev(file_path)}")
         hint = "'skillset init'" if is_local else "'skillset init --global'"
@@ -374,6 +379,18 @@ def _collect_individual_decisions(names, source_dir, skills_dir, use_copy):
 def _prompt_for_new_skills(new_skills_found, new_skills_ctx, skills_dir, file_path, mode="ask"):
     """Prompt user for new untracked skills. Returns count of linked skills."""
     if not new_skills_found:
+        return 0
+
+    if mode == "notify":
+        print("\n--- New skills available (not installed) ---")
+        for repo_key, names in new_skills_found.items():
+            print(f"\n{repo_key}: {len(names)} new skill(s):")
+            for name in names:
+                print(f"  {name}")
+        print(
+            "\nAdd them to 'enabled:' in skillset.yaml,"
+            " or run 'skillset update --yes' / '--no' to accept/ignore all."
+        )
         return 0
 
     total = 0

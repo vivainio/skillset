@@ -162,7 +162,7 @@ links:
 
 ### Update
 
-`update` applies the config: it processes `links:`, pulls each repo, links skills in `enabled`, removes those in `disabled`, and prompts for any new skills in the repo that aren't yet listed in either list. `enabled: ["*"]` links every skill (minus anything in `disabled`). Any entry containing `*`, `?`, or `[` is treated as an fnmatch glob against available skill names. Snapshot entries are skipped entirely.
+`update` applies the config: it processes `links:`, pulls each repo, links skills in `enabled`, and removes those in `disabled`. New skills in a repo that aren't yet listed in either list are handled by scope: with a local `skillset.yaml` they are only reported (the file is a declaration -- it is never amended without `-y`/`-n`); with the global config you get an interactive add/ignore/select prompt. `enabled: ["*"]` links every skill (minus anything in `disabled`). Any entry containing `*`, `?`, or `[` is treated as an fnmatch glob against available skill names. Snapshot entries are skipped entirely.
 
 ```bash
 skillset update                              # apply local skillset.yaml if found, otherwise global
