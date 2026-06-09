@@ -31,6 +31,13 @@ def test_glob_filter(skill_repo, tmp_path):
     assert sorted(linked) == ["skill-a", "skill-b"]
 
 
+def test_percent_wildcard_alias(skill_repo, tmp_path):
+    """`%` is accepted as a shell-safe alias for `*`."""
+    target = tmp_path / "skills"
+    linked = link_skills(skill_repo, target, only={"skill-%"}, copy=True)
+    assert sorted(linked) == ["skill-a", "skill-b"]
+
+
 def test_existing_only(skill_repo, tmp_path):
     target = tmp_path / "skills"
     target.mkdir(parents=True)

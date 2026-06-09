@@ -1,5 +1,6 @@
 """Command handlers for adding and initializing skills."""
 
+import fnmatch
 import shutil
 import sys
 from pathlib import Path
@@ -10,7 +11,7 @@ from skillset.commands._templates import (
     LOCAL_SKILLSET_TEMPLATE,
 )
 from skillset.discovery import find_commands, find_skills
-from skillset.linking import is_managed, link_commands, link_skills
+from skillset.linking import has_glob, is_managed, link_commands, link_skills, normalize_glob
 from skillset.manifest import record_install
 from skillset.paths import (
     SKILLSET_CONFIG_FILE,
@@ -47,22 +48,10 @@ def cmd_add(
     unsnapshot: bool = False,
 ) -> None:
     """Add skills and permissions from a GitHub repo or local directory."""
-    if snapshot and unsnapshot:
-        print("--snapshot and --unsnapshot are mutually exclusive")
-        sys.exit(1)
+    copy, force, ref = _apply_snapshot_flags(snapshot, unsnapshot, copy, force, ref)
 
     skillset_root = None if g else find_skillset_root()
     is_local = skillset_root is not None
-
-    # --snapshot: copy as-is, freeze in yaml; re-snapshotting overrides ref.
-    if snapshot:
-        copy = True
-        force = True
-
-    # --unsnapshot: drop the pinned ref + snapshot flag, switch back to live links.
-    if unsnapshot:
-        force = True
-        ref = None
 
     if not _check_ref_conflict(repo, ref, is_local, skillset_root, force):
         return
@@ -130,6 +119,24 @@ def cmd_add(
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 
+def _apply_snapshot_flags(snapshot, unsnapshot, copy, force, ref):
+    """Resolve --snapshot / --unsnapshot into (copy, force, ref) adjustments.
+
+    --snapshot: copy as-is and freeze in yaml; re-snapshotting overrides ref.
+    --unsnapshot: drop the pinned ref + snapshot flag, switch back to live links.
+    """
+    if snapshot and unsnapshot:
+        print("--snapshot and --unsnapshot are mutually exclusive")
+        sys.exit(1)
+    if snapshot:
+        copy = True
+        force = True
+    if unsnapshot:
+        force = True
+        ref = None
+    return copy, force, ref
+
+
 def _pin_snapshot_ref(snapshot: bool, repo_dir, ref):
     """For snapshot installs, replace ref with the resolved HEAD SHA."""
     if not snapshot or repo_dir is None:
@@ -153,8 +160,15 @@ def _link_skills_for_add(source_dir, skills_dir, skills, interactive, use_copy, 
     if skill_filter is not None:
         available_skills = find_skills(source_dir)
         available_names = {s.name for s in available_skills}
-        enabled = sorted(skill_filter & available_names)
-        disabled = sorted(available_names - skill_filter)
+        # Persist glob patterns as patterns (canonical `*` form) so `update`
+        # re-expands them and picks up new matching skills later; literals are
+        # stored verbatim. Disabled = everything not selected by either.
+        patterns = {normalize_glob(n) for n in skill_filter if has_glob(n)}
+        literals = {n for n in skill_filter if not has_glob(n)}
+        matched = {n for n in available_names if any(fnmatch.fnmatch(n, p) for p in patterns)}
+        selected = (literals & available_names) | matched
+        enabled = sorted((literals & available_names) | patterns)
+        disabled = sorted(available_names - selected)
         linked = link_skills(
             source_dir,
             skills_dir,

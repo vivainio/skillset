@@ -8,9 +8,11 @@ from pathlib import Path
 
 from skillset.linking import (
     get_copy_source,
+    has_glob,
     is_link,
     is_managed,
     is_managed_copy,
+    normalize_glob,
     remove_link,
     remove_managed,
 )
@@ -53,7 +55,7 @@ def cmd_remove(*, name: str | None = None, g: bool = False, interactive: bool = 
         print("Provide a skill name or use -i for interactive selection")
         sys.exit(1)
 
-    if any(c in name for c in "*?["):
+    if has_glob(name):
         _remove_by_glob(skills_dir, name)
         return
 
@@ -76,8 +78,9 @@ def _remove_by_glob(skills_dir: Path, pattern: str) -> None:
     if not skills_dir.exists():
         print(f"No skills in {abbrev(skills_dir)}")
         sys.exit(1)
+    glob = normalize_glob(pattern)
     matched = sorted(
-        p.name for p in skills_dir.iterdir() if fnmatch.fnmatch(p.name, pattern) and is_managed(p)
+        p.name for p in skills_dir.iterdir() if fnmatch.fnmatch(p.name, glob) and is_managed(p)
     )
     if not matched:
         print(f"No managed skills matching '{pattern}' in {abbrev(skills_dir)}")

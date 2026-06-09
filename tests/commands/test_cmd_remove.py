@@ -68,6 +68,18 @@ def test_glob_pattern(env, source_repo, capsys):
     assert not (skills_dir / "skill-b").exists()
 
 
+def test_percent_wildcard_alias(env, source_repo, capsys):
+    """`%` is a shell-safe alias for `*` so patterns need no quoting."""
+    skills_dir = env.home / ".claude" / "skills"
+    skills_dir.mkdir(parents=True)
+    (skills_dir / "skill-a").symlink_to(source_repo / "skill-a")
+    (skills_dir / "skill-b").symlink_to(source_repo / "skill-b")
+
+    cmd_remove(name="skill-%")
+    assert not (skills_dir / "skill-a").exists()
+    assert not (skills_dir / "skill-b").exists()
+
+
 def test_glob_no_match_exits(env, source_repo):
     skills_dir = env.home / ".claude" / "skills"
     skills_dir.mkdir(parents=True)

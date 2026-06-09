@@ -7,7 +7,14 @@ from fnmatch import fnmatchcase
 from pathlib import Path
 
 from skillset.discovery import find_skills
-from skillset.linking import is_managed, link_commands, link_skills, remove_managed
+from skillset.linking import (
+    has_glob,
+    is_managed,
+    link_commands,
+    link_skills,
+    normalize_glob,
+    remove_managed,
+)
 from skillset.manifest import record_install
 from skillset.paths import (
     SKILLSET_CONFIG_FILE,
@@ -34,17 +41,13 @@ def _resolve_toml_path(file, g):
     return get_global_skillset_path()
 
 
-def _is_glob(pattern: str) -> bool:
-    """Check if a list entry is a glob pattern."""
-    return any(c in pattern for c in "*?[")
-
-
 def _expand_patterns(patterns: list[str], names: set[str]) -> set[str]:
     """Expand glob entries against available names. Literal entries pass through."""
     result: set[str] = set()
     for p in patterns:
-        if _is_glob(p):
-            result |= {n for n in names if fnmatchcase(n, p)}
+        if has_glob(p):
+            glob = normalize_glob(p)
+            result |= {n for n in names if fnmatchcase(n, glob)}
         else:
             result.add(p)
     return result
@@ -205,7 +208,7 @@ def _update_dict_entry(
         enabled_declared = enabled_expanded - disabled_set
         # "new" = anything in available not yet matched by a pattern and not
         # listed literally. Patterns that hit a name suppress its prompt.
-        literals = {p for p in (enabled_raw + disabled_raw) if not _is_glob(p)}
+        literals = {p for p in (enabled_raw + disabled_raw) if not has_glob(p)}
         tracked = enabled_expanded | disabled_set | literals
 
     total = _update_lists(
@@ -388,7 +391,7 @@ def _prompt_for_new_skills(new_skills_found, new_skills_ctx, skills_dir, file_pa
             for name in names:
                 print(f"  {name}")
         print(
-            "\nAdd them to 'enabled:' in skillset.yaml,"
+            "\nInstall one with 'skillset add <name>',"
             " or run 'skillset update --yes' / '--no' to accept/ignore all."
         )
         return 0

@@ -97,7 +97,8 @@ skillset add vivainio/agent-skills          # re-add without --try to keep perma
 ```bash
 skillset remove zaira          # remove from detected scope (local or global)
 skillset remove zaira -g       # remove from global skills
-skillset remove "ai-*"         # glob patterns supported
+skillset remove "ai-*"         # glob patterns supported (quote to protect from the shell)
+skillset remove ai-%           # % is a shell-safe alias for * -- no quoting needed
 ```
 
 ### List installed skills
@@ -162,7 +163,7 @@ links:
 
 ### Update
 
-`update` applies the config: it processes `links:`, pulls each repo, links skills in `enabled`, and removes those in `disabled`. New skills in a repo that aren't yet listed in either list are handled by scope: with a local `skillset.yaml` they are only reported (the file is a declaration -- it is never amended without `-y`/`-n`); with the global config you get an interactive add/ignore/select prompt. `enabled: ["*"]` links every skill (minus anything in `disabled`). Any entry containing `*`, `?`, or `[` is treated as an fnmatch glob against available skill names. Snapshot entries are skipped entirely.
+`update` applies the config: it processes `links:`, pulls each repo, links skills in `enabled`, and removes those in `disabled`. New skills in a repo that aren't yet listed in either list are handled by scope: with a local `skillset.yaml` they are only reported (the file is a declaration -- it is never amended without `-y`/`-n`); with the global config you get an interactive add/ignore/select prompt. `enabled: ["*"]` links every skill (minus anything in `disabled`). Any entry containing `*`, `?`, `[`, or `%` is treated as an fnmatch glob against available skill names, where `%` is an alias for `*`. The same glob syntax works on the command line (`add -s`, `remove`); prefer `%` there since `*` is expanded by most shells unless quoted. Snapshot entries are skipped entirely.
 
 ```bash
 skillset update                              # apply local skillset.yaml if found, otherwise global

@@ -12,6 +12,21 @@ from skillset.paths import IS_WINDOWS
 
 SKILLSET_SOURCE_MARKER = ".skillset-source"
 
+# `%` is accepted as a shell-safe alias for the `*` wildcard: bash/zsh/fish/nu
+# all leave `%` untouched, so `bf-%` survives without quoting where `bf-*` would
+# be glob-expanded (or rejected) by the shell before skillset ever sees it.
+GLOB_CHARS = "*?[%"
+
+
+def has_glob(name: str) -> bool:
+    """True if name is a wildcard pattern (including the `%` alias)."""
+    return any(c in name for c in GLOB_CHARS)
+
+
+def normalize_glob(pattern: str) -> str:
+    """Translate the shell-safe `%` wildcard alias to fnmatch's `*`."""
+    return pattern.replace("%", "*")
+
 
 def create_dir_link(link_path: Path, target_path: Path) -> None:
     """Create a directory link (junction on Windows, symlink on Unix)."""
@@ -109,8 +124,8 @@ def _resolve_skill_filter(
 
     verified = set()
     for name in only:
-        if any(c in name for c in "*?["):
-            matched = fnmatch.filter(available_names, name)
+        if has_glob(name):
+            matched = fnmatch.filter(available_names, normalize_glob(name))
             if matched:
                 verified.update(matched)
             elif not quiet_missing:

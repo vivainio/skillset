@@ -55,7 +55,11 @@ def add(
     ] = False,
     skill: Annotated[
         list[str] | None,
-        typer.Option("-s", "--skill", help="Add only this skill by name (repeatable)"),
+        typer.Option(
+            "-s",
+            "--skill",
+            help="Add only this skill by name or glob (repeatable); use % for * to skip quoting",
+        ),
     ] = None,
     subpath: Annotated[
         str | None,
@@ -166,7 +170,7 @@ def clean(
 @app.command()
 def remove(
     name: Annotated[
-        str | None, typer.Argument(help="Skill name or glob pattern (e.g. bs-*)")
+        str | None, typer.Argument(help="Skill name or glob (e.g. bs-% or 'bs-*')")
     ] = None,
     global_: Annotated[
         bool,

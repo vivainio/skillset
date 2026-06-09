@@ -148,6 +148,27 @@ def test_add_skill_name_not_found_exits(env):
         cmd_add(repo="nonexistent")
 
 
+def test_add_glob_filter_persists_pattern(env, source_repo, capsys):
+    """A glob in -s links matching skills and persists the pattern (not the
+    expanded names) so `update` re-expands it later. `%` is the shell-safe alias."""
+    yaml_path = env.home / ".claude" / "skillset.yaml"
+    yaml_path.write_text("skills: {}\n")
+
+    with patch("skillset.commands._resolve.clone_or_pull", return_value=source_repo):
+        with patch("skillset.commands._resolve.get_repo_dir", return_value=source_repo):
+            with patch("skillset.commands._resolve.is_link", return_value=False):
+                cmd_add(repo="owner/repo", skills=["skill-%"])
+
+    skills_dir = env.home / ".claude" / "skills"
+    assert (skills_dir / "skill-a").is_symlink()
+    assert (skills_dir / "skill-b").is_symlink()
+
+    from skillset.paths import load_skillset
+
+    entry = load_skillset(yaml_path)["skills"]["owner/repo"]
+    assert entry["enabled"] == ["skill-*"]
+
+
 def test_add_registers_in_skillset_yaml(env, source_repo, capsys):
     yaml_path = env.home / ".claude" / "skillset.yaml"
     yaml_path.write_text("skills: {}\n")
