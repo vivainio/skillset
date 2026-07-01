@@ -31,6 +31,38 @@ def get_global_skills_dir() -> Path:
     return Path.home() / ".claude" / "skills"
 
 
+def ensure_copilot_skills_symlink() -> bool:
+    """Link ~/.copilot/skills -> ~/.claude/skills if Copilot CLI is installed and unlinked.
+
+    No-ops if ~/.copilot doesn't exist, or if ~/.copilot/skills already exists
+    (as a real dir, a symlink, or a broken symlink) -- never overwrites. Returns
+    True if a new link was created.
+    """
+    copilot_dir = Path.home() / ".copilot"
+    if not copilot_dir.is_dir():
+        return False
+    link_path = copilot_dir / "skills"
+    if link_path.is_symlink() or link_path.exists():
+        return False
+    target = get_global_skills_dir()
+    try:
+        if IS_WINDOWS:
+            subprocess.run(
+                ["cmd", "/c", "mklink", "/J", str(link_path), str(target)],
+                check=True,
+                capture_output=True,
+            )
+        else:
+            link_path.symlink_to(target)
+    except (OSError, subprocess.CalledProcessError):
+        print(
+            f"Could not link {abbrev(link_path)} -> {abbrev(target)} "
+            "-- if this persists, retry from an admin shell."
+        )
+        return False
+    return True
+
+
 def get_git_root() -> Path | None:
     """Get the root of the current git repository, or None if not in one."""
     try:

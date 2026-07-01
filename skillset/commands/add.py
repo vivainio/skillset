@@ -17,6 +17,7 @@ from skillset.paths import (
     SKILLSET_CONFIG_FILE,
     abbrev,
     add_to_skillset,
+    ensure_copilot_skills_symlink,
     find_skillset_root,
     get_cache_dir,
     get_global_commands_dir,
@@ -86,6 +87,9 @@ def cmd_add(
     )
 
     _print_linked("skill", linked_skills, use_copy, skills_dir)
+
+    if not is_local and linked_skills and ensure_copilot_skills_symlink():
+        print(f"Linked {abbrev(Path.home() / '.copilot' / 'skills')} -> {abbrev(skills_dir)}")
 
     commands_dir = (
         (skillset_root / ".claude" / "commands") if is_local else get_global_commands_dir()
