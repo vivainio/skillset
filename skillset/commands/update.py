@@ -97,6 +97,7 @@ def cmd_update(
             scope,
             new_skills_found,
             new_skills_ctx,
+            file_path,
         )
         total_linked += linked
 
@@ -138,7 +139,7 @@ def _update_dirs(is_local, file_path):
     return root / ".claude" / "skills", root / ".claude" / "commands"
 
 
-def _update_entry(repo_key, value, skills_dir, commands_dir, scope, new_found, new_ctx):
+def _update_entry(repo_key, value, skills_dir, commands_dir, scope, new_found, new_ctx, file_path):
     """Update a single entry. Returns count of linked skills."""
     if not isinstance(value, dict):
         print(f"\nSkipping {repo_key}: entry must be a sub-table")
@@ -151,6 +152,7 @@ def _update_entry(repo_key, value, skills_dir, commands_dir, scope, new_found, n
         scope,
         new_found,
         new_ctx,
+        file_path,
     )
 
 
@@ -162,6 +164,7 @@ def _update_dict_entry(
     scope,
     new_found,
     new_ctx,
+    file_path,
 ):
     """Update a sub-table entry with enabled/disabled lists."""
     if value.get("snapshot"):
@@ -190,6 +193,7 @@ def _update_dict_entry(
         editable,
         source_str,
         path_str,
+        file_path,
         ref_str,
     )
     if source_dir is None:
@@ -250,11 +254,11 @@ def _last_commit_info(repo_dir: Path) -> str | None:
     return result.stdout.strip() or None
 
 
-def _resolve_update_source(repo_key, editable, source_str, path_str, ref_str=None):
+def _resolve_update_source(repo_key, editable, source_str, path_str, file_path, ref_str=None):
     """Resolve source directory for update."""
     owner = repo_name = None
     if editable:
-        return _resolve_editable_source(repo_key, source_str, path_str, owner, repo_name)
+        return _resolve_editable_source(repo_key, source_str, path_str, file_path, owner, repo_name)
 
     label = repo_key + (f"@{ref_str}" if ref_str else "")
     print(f"\nUpdating {label}...")
@@ -274,13 +278,23 @@ def _resolve_update_source(repo_key, editable, source_str, path_str, ref_str=Non
     return source_dir, repo_dir, owner, repo_name
 
 
-def _resolve_editable_source(repo_key, source_str, path_str, owner, repo_name):
-    """Resolve editable source directory for update."""
+def _resolve_editable_source(repo_key, source_str, path_str, file_path, owner, repo_name):
+    """Resolve editable source directory for update.
+
+    A relative source path is resolved against the skillset.yaml's own
+    directory, not the CWD -- otherwise it breaks when `skillset update`
+    is run from a subdirectory of the project.
+    """
     if not source_str:
         print(f"\n{repo_key}: editable requires 'source' path")
         return None, None, None, None
     print(f"\nUpdating {repo_key} (editable)...")
-    base_dir = Path(source_str).expanduser().resolve()
+    expanded = Path(source_str).expanduser()
+    base_dir = (
+        expanded.resolve()
+        if expanded.is_absolute()
+        else (file_path.parent / expanded).resolve()
+    )
     source_dir = base_dir / path_str if path_str else base_dir
     if not source_dir.is_dir():
         if path_str:

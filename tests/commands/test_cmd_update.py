@@ -276,6 +276,29 @@ def test_sync_local_scope(env, source_repo, capsys, monkeypatch):
     assert "Updating" in output
 
 
+def test_sync_editable_relative_source_from_local_yaml_dir(env, capsys, monkeypatch):
+    """Relative editable `source` resolves against the yaml's dir, not the CWD."""
+    monkeypatch.setattr("skillset.commands.update.find_skillset_root", lambda: env.project)
+    sibling = env.project.parent / "bt-docs"
+    (sibling / "some-skill").mkdir(parents=True)
+    (sibling / "some-skill" / "SKILL.md").write_text("---\nname: some-skill\n---\n")
+
+    yaml_file = env.project / "skillset.yaml"
+    yaml_file.write_text("skills:\n  bt-docs:\n    editable: true\n    source: ../bt-docs\n")
+
+    (env.project / ".claude" / "skills").mkdir(parents=True)
+    (env.project / ".claude" / "commands").mkdir(parents=True)
+
+    subdir = env.project / "subdir"
+    subdir.mkdir()
+    monkeypatch.chdir(subdir)
+
+    cmd_update()
+    output = capsys.readouterr().out
+    assert "Source not found" not in output
+    assert (env.project / ".claude" / "skills" / "some-skill").is_symlink()
+
+
 def test_sync_local_file_not_found(env, capsys, monkeypatch):
     """Local sync file not found shows local hint."""
     monkeypatch.setattr("skillset.commands.update.find_skillset_root", lambda: env.project)
