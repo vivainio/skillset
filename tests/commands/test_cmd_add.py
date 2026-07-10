@@ -53,6 +53,27 @@ def test_add_no_repo_exits(env):
         cmd_add()
 
 
+def test_add_fetch_links_nothing(env, source_repo, capsys):
+    cmd_add(repo=str(source_repo), fetch=True)
+
+    skills_dir = env.home / ".claude" / "skills"
+    assert not skills_dir.exists() or not any(skills_dir.iterdir())
+    output = capsys.readouterr().out
+    assert "Fetched" in output
+
+
+def test_add_fetch_registers_with_no_skills_enabled(env, source_repo):
+    cmd_add(repo=str(source_repo), fetch=True)
+
+    toml_path = env.home / ".claude" / "skillset.yaml"
+    from skillset.paths import load_skillset
+
+    data = load_skillset(toml_path)
+    entry = next(iter(data["skills"].values()))
+    assert entry["enabled"] == []
+    assert set(entry["disabled"]) == {"skill-a", "skill-b"}
+
+
 def test_add_global_flag_skips_local_detection(env, source_repo, capsys):
     """With --global, skills go to global dir even when skillset.toml exists."""
     with patch("builtins.input", return_value="y"):

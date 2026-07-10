@@ -41,6 +41,19 @@ skillset add https://github.com/vivainio/agent-skills
 skillset add https://github.com/vivainio/agent-skills/tree/main/extra-skills
 ```
 
+### Fetch a repo without linking any skills
+
+```bash
+skillset add vivainio/agent-skills --fetch
+```
+
+`--fetch` clones/caches the repo and registers it in `skillset.yaml` with
+`enabled: []` (its current skills go into `disabled`), but links nothing.
+Useful for pulling a repo into the local cache -- e.g. to search or browse
+its skills later -- without installing any of them yet. A later
+`skillset update` will only prompt about skills added upstream after the
+fetch, not the ones that already existed when you fetched.
+
 ### Copy instead of symlink
 
 ```bash

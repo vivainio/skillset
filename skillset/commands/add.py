@@ -47,6 +47,7 @@ def cmd_add(
     force: bool = False,
     snapshot: bool = False,
     unsnapshot: bool = False,
+    fetch: bool = False,
 ) -> None:
     """Add skills and permissions from a GitHub repo or local directory."""
     copy, force, ref = _apply_snapshot_flags(snapshot, unsnapshot, copy, force, ref)
@@ -76,6 +77,24 @@ def cmd_add(
     if subpath and not source_dir.is_dir():
         print(f"Path not found in repo: {subpath}")
         sys.exit(1)
+
+    if fetch:
+        _do_fetch(
+            repo_dir,
+            source_dir,
+            temp_dir,
+            toml_key,
+            toml_source,
+            subpath,
+            is_editable,
+            is_local,
+            skillset_root,
+            ref,
+            snapshot,
+            unsnapshot,
+            trial,
+        )
+        return
 
     use_copy = copy or no_cache
     ref = _pin_snapshot_ref(snapshot, repo_dir, ref)
@@ -119,6 +138,44 @@ def cmd_add(
     if not linked_skills and not linked_commands:
         print("No skills found in repo")
 
+    if temp_dir:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def _do_fetch(
+    repo_dir,
+    source_dir,
+    temp_dir,
+    toml_key,
+    toml_source,
+    subpath,
+    is_editable,
+    is_local,
+    skillset_root,
+    ref,
+    snapshot,
+    unsnapshot,
+    trial,
+):
+    """Clone/cache the repo and register it with no skills enabled -- link nothing."""
+    print(f"Fetched {abbrev(repo_dir)}")
+    if toml_key and not trial:
+        available = find_skills(source_dir)
+        disabled = sorted(s.name for s in available)
+        _ensure_toml_exists(is_editable, is_local, skillset_root)
+        _register_in_toml(
+            toml_key,
+            subpath,
+            [],
+            disabled,
+            is_editable,
+            toml_source,
+            is_local,
+            skillset_root,
+            ref,
+            snapshot,
+            unsnapshot,
+        )
     if temp_dir:
         shutil.rmtree(temp_dir, ignore_errors=True)
 

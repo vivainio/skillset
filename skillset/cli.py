@@ -103,6 +103,13 @@ def add(
             help="Drop snapshot/ref pin and switch back to live links",
         ),
     ] = False,
+    fetch: Annotated[
+        bool,
+        typer.Option(
+            "--fetch",
+            help="Clone/cache the repo and register it with no skills enabled -- link nothing now",
+        ),
+    ] = False,
 ) -> None:
     """Add skills from a GitHub repo. Installs locally if skillset.yaml is found in path."""
     cmd_add(
@@ -118,6 +125,7 @@ def add(
         force=force,
         snapshot=snapshot,
         unsnapshot=unsnapshot,
+        fetch=fetch,
     )
 
 
