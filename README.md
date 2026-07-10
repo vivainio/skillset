@@ -114,6 +114,19 @@ skillset remove "ai-*"         # glob patterns supported (quote to protect from 
 skillset remove ai-%           # % is a shell-safe alias for * -- no quoting needed
 ```
 
+### Search cached skills
+
+```bash
+skillset search jira            # skills whose name/description mentions "jira"
+skillset search jenkins build   # all terms must match (AND)
+```
+
+Searches skill names and descriptions across every repo already cloned into
+the cache (`skillset add ... --fetch` is a good way to get one in there) plus
+any editable sources registered in the global `skillset.yaml`. It's local and
+offline -- no registry lookup -- so it only finds skills you've fetched
+before.
+
 ### List installed skills
 
 ```bash
@@ -199,7 +212,7 @@ Vercel's [`skills`](https://github.com/vercel-labs/skills) CLI is a cross-agent 
 | --------------- | -------------------------------------- | ------------------------------------- |
 | Target agents   | Claude Code                            | 40+ (Claude, Cursor, Codex, Copilot…) |
 | Slash commands  | Links `/commands` from repos           | No                                    |
-| Skill discovery | n/a                                    | Central registry (89K+ skills)        |
+| Skill discovery | Local search over cached repos (`search`) | Central registry (89K+ skills)     |
 | Install method  | `pip` / `uv tool install` / `uvx`      | `npx`                                 |
 | Scope default   | Project if available, Global otherwise | Project                               |
 

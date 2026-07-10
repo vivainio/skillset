@@ -10,6 +10,7 @@ from skillset.commands import (
     cmd_init,
     cmd_list,
     cmd_remove,
+    cmd_search,
     cmd_update,
 )
 
@@ -127,6 +128,17 @@ def add(
         unsnapshot=unsnapshot,
         fetch=fetch,
     )
+
+
+@app.command()
+def search(
+    query: Annotated[
+        list[str],
+        typer.Argument(help="Search term(s) -- all must match a skill's name or description"),
+    ],
+) -> None:
+    """Search skill names/descriptions across cached repos and editable sources."""
+    cmd_search(query=query)
 
 
 @app.command()
