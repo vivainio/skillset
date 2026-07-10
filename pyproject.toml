@@ -11,6 +11,9 @@ skillset = "skillset.cli:main"
 [tool.setuptools.packages.find]
 include = ["skillset*"]
 
+[tool.setuptools.package-data]
+skillset = ["skill/**/*.md"]
+
 [tool.uv]
 package = true
 

@@ -8,6 +8,7 @@ from skillset.commands import (
     cmd_add,
     cmd_clean,
     cmd_init,
+    cmd_install_skills,
     cmd_list,
     cmd_remove,
     cmd_search,
@@ -128,6 +129,16 @@ def add(
         unsnapshot=unsnapshot,
         fetch=fetch,
     )
+
+
+@app.command("install-skills")
+def install_skills(
+    global_: Annotated[
+        bool, typer.Option("-g", "--global", help="Install globally even if skillset.yaml is found")
+    ] = False,
+) -> None:
+    """Install skillset's own usage-guide skill (teaches Claude Code the skillset CLI)."""
+    cmd_install_skills(g=global_)
 
 
 @app.command()

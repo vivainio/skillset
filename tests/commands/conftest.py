@@ -21,6 +21,7 @@ def env(tmp_path, monkeypatch):
         "skillset.commands.update",
         "skillset.commands.remove",
         "skillset.commands.list",
+        "skillset.commands.install_skills",
     ):
         monkeypatch.setattr(f"{mod}.find_skillset_root", lambda: None)
 

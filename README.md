@@ -24,6 +24,16 @@ uv tool install . -e
 
 By default, commands detect scope automatically: if a `skillset.yaml` is found in the current directory or any parent, skills install to the project (`.claude/skills/`). Otherwise, they install globally (`~/.claude/skills/`). Use `-g` / `--global` to force global scope.
 
+### Install skillset's own skill
+
+```bash
+skillset install-skills       # teach Claude Code the skillset CLI itself
+```
+
+Installs a bundled `SKILL.md` (ships with the package, no network access) that
+documents the `skillset` CLI's own commands, so Claude Code can use `skillset`
+correctly without needing this README pasted into context.
+
 ### Add skills from GitHub
 
 ```bash
