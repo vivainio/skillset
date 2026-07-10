@@ -4,7 +4,7 @@ import importlib.resources
 import sys
 from pathlib import Path
 
-from skillset.linking import copy_dir, is_managed, remove_managed
+from skillset.linking import copy_dir
 from skillset.paths import (
     abbrev,
     ensure_copilot_skills_symlink,
@@ -36,12 +36,8 @@ def cmd_install_skills(*, g: bool = False) -> None:
     skills_dir.mkdir(parents=True, exist_ok=True)
 
     target = skills_dir / bundled.name
-    if is_managed(target):
-        remove_managed(target)
-    elif target.exists():
-        print(f"Skipping: {abbrev(target)} already exists (not managed by skillset)")
-        return
-
+    if target.is_symlink():
+        target.unlink()
     copy_dir(bundled, target, source_label="skillset (bundled)")
     print(f"Installed skillset skill to {abbrev(target)}")
 
