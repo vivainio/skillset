@@ -119,7 +119,13 @@ skillset remove ai-%           # % is a shell-safe alias for * -- no quoting nee
 ```bash
 skillset search jira            # skills whose name/description mentions "jira"
 skillset search jenkins build   # all terms must match (AND)
+skillset search jira-%          # glob: name starting with "jira-" (% is a shell-safe * alias)
+skillset search %config%        # glob: "config" anywhere in name or description
 ```
+
+A term with `*`, `?`, `[`, or `%` is matched as an fnmatch glob against the
+skill name and against the full name+description text; plain terms fall back
+to a substring match.
 
 Searches skill names and descriptions across every repo already cloned into
 the cache (`skillset add ... --fetch` is a good way to get one in there) plus

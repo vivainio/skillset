@@ -48,6 +48,42 @@ def test_search_requires_all_terms(env, capsys):
     assert "No matching skills found" in output
 
 
+def test_search_glob_prefix(env, capsys):
+    _cache_repo(
+        env,
+        "owner",
+        "repo",
+        {"jira-check": "Pre-release checklist", "zaira": "Access Jira tickets offline"},
+    )
+
+    cmd_search(query=["jira-*"])
+    output = capsys.readouterr().out
+    assert "jira-check" in output
+    assert "zaira" not in output
+
+
+def test_search_glob_percent_alias(env, capsys):
+    _cache_repo(env, "owner", "repo", {"jira-check": "Pre-release checklist"})
+
+    cmd_search(query=["jira-%"])
+    output = capsys.readouterr().out
+    assert "jira-check" in output
+
+
+def test_search_glob_substring(env, capsys):
+    _cache_repo(
+        env,
+        "owner",
+        "repo",
+        {"zaira": "Access Jira tickets offline", "other": "Unrelated"},
+    )
+
+    cmd_search(query=["%jira%"])
+    output = capsys.readouterr().out
+    assert "zaira" in output
+    assert "other" not in output
+
+
 def test_search_skips_local_alias_dir(env, capsys):
     """The repos/local/ dir is for editable-source symlinks -- not scanned directly."""
     _cache_repo(env, "local", "some-repo", {"zaira": "Access Jira tickets offline"})

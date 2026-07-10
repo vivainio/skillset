@@ -1,9 +1,10 @@
 """Command handler for searching skills across cached and editable sources."""
 
+import fnmatch
 from pathlib import Path
 
 from skillset.discovery import find_skills, parse_skill_metadata
-from skillset.linking import is_link
+from skillset.linking import has_glob, is_link, normalize_glob
 from skillset.paths import get_cache_dir, get_global_skillset_path, load_skillset
 
 
@@ -45,9 +46,23 @@ def _cached_repos() -> list[tuple[str, Path]]:
     return sources
 
 
+def _term_matches(term: str, name: str, haystack: str) -> bool:
+    """A single search term matches by substring, or by glob if it has wildcards.
+
+    `*`/`?`/`[...]`/`%` (the shell-safe `*` alias) trigger fnmatch against the
+    skill name and the full name+description haystack -- e.g. `jira-%` matches
+    names starting with "jira-", `%config%` matches "config" anywhere.
+    """
+    if has_glob(term):
+        pattern = normalize_glob(term)
+        return fnmatch.fnmatch(name, pattern) or fnmatch.fnmatch(haystack, pattern)
+    return term in haystack
+
+
 def _matches(terms: list[str], name: str, description: str) -> bool:
     haystack = f"{name} {description}".lower()
-    return all(term in haystack for term in terms)
+    name = name.lower()
+    return all(_term_matches(term, name, haystack) for term in terms)
 
 
 def cmd_search(query: list[str]) -> None:

@@ -134,7 +134,10 @@ def add(
 def search(
     query: Annotated[
         list[str],
-        typer.Argument(help="Search term(s) -- all must match a skill's name or description"),
+        typer.Argument(
+            help="Search term(s) -- all must match a skill's name or description; "
+            "supports glob wildcards, use % for * to skip quoting"
+        ),
     ],
 ) -> None:
     """Search skill names/descriptions across cached repos and editable sources."""
