@@ -18,17 +18,25 @@ from skillset.linking import (
 )
 from skillset.manifest import load_manifest, save_manifest
 from skillset.paths import (
+    SKILLSET_CONFIG_FILE,
     abbrev,
     find_skillset_root,
     get_cache_dir,
+    get_global_commands_dir,
     get_global_skills_dir,
+    get_global_skillset_path,
     get_project_skills_dir,
+    remove_from_skillset,
 )
 from skillset.ui import fzf_select
 
 
 def cmd_remove(*, name: str | None = None, g: bool = False, interactive: bool = False) -> None:
-    """Remove a skill by name, or interactively select skills to remove."""
+    """Remove a skill by name, a repo (owner/repo) entirely, or interactively select skills."""
+    if name and "/" in name:
+        cmd_remove_repo(name, g=g)
+        return
+
     skillset_root = None if g else find_skillset_root()
     if skillset_root:
         skills_dir = skillset_root / ".claude" / "skills"
@@ -88,6 +96,70 @@ def _remove_by_glob(skills_dir: Path, pattern: str) -> None:
     for name in matched:
         remove_managed(skills_dir / name)
         print(f"Removed {name} from {abbrev(skills_dir)}")
+
+
+def cmd_remove_repo(repo_key: str, *, g: bool = False) -> None:
+    """Remove a repo entirely: its linked skills/commands, skillset.yaml entry, and cached clone."""
+    skillset_root = None if g else find_skillset_root()
+    is_local = skillset_root is not None
+    skills_dir = (skillset_root / ".claude" / "skills") if is_local else get_global_skills_dir()
+    commands_dir = (
+        (skillset_root / ".claude" / "commands") if is_local else get_global_commands_dir()
+    )
+    toml_path = (skillset_root / SKILLSET_CONFIG_FILE) if is_local else get_global_skillset_path()
+
+    removed = _remove_managed_from_source(skills_dir, repo_key, "skill")
+    removed += _remove_managed_from_source(commands_dir, repo_key, "command")
+
+    removed_from_toml = remove_from_skillset(toml_path, repo_key)
+    if removed_from_toml:
+        print(f"Removed {repo_key} from {abbrev(toml_path)}")
+
+    repo_removed = _remove_cached_repo_dir(repo_key)
+
+    manifest = load_manifest()
+    if repo_key in manifest:
+        del manifest[repo_key]
+        save_manifest(manifest)
+
+    if not removed and not removed_from_toml and not repo_removed:
+        print(f"'{repo_key}' not found in {abbrev(toml_path)} or the cache")
+        sys.exit(1)
+
+
+def _remove_managed_from_source(target_dir: Path, repo_key: str, kind: str) -> int:
+    """Remove managed items in target_dir sourced from repo_key. Returns count removed."""
+    if not target_dir.exists():
+        return 0
+    removed = 0
+    for item in sorted(target_dir.iterdir()):
+        if not is_managed(item):
+            continue
+        source = _get_managed_source(item)
+        if source is None:
+            continue
+        if repo_key in source or abbrev(repo_key) in abbrev(source):
+            remove_managed(item)
+            print(f"Removed {kind} {item.name}")
+            removed += 1
+    return removed
+
+
+def _remove_cached_repo_dir(repo_key: str) -> bool:
+    """Remove the cached clone for repo_key, if present. Returns True if removed."""
+    cache_dir = get_cache_dir()
+    repo_dir = cache_dir / repo_key.replace("/", os.sep)
+    if not repo_dir.exists():
+        return False
+    if is_link(repo_dir):
+        remove_link(repo_dir)
+    else:
+        shutil.rmtree(repo_dir)
+    parent = repo_dir.parent
+    if parent.exists() and parent != cache_dir and not any(parent.iterdir()):
+        parent.rmdir()
+    print(f"Removed cached repo {abbrev(repo_dir)}")
+    return True
 
 
 def cmd_clean(*, g: bool = False) -> None:

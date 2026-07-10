@@ -123,6 +123,16 @@ skillset remove zaira -g       # remove from global skills
 skillset remove ai-%           # glob pattern -- % is a shell-safe wildcard, no quoting needed
 ```
 
+### Remove a whole repo
+
+```bash
+skillset remove JuliusBrussee/caveman   # remove its linked skills, skillset.yaml entry, and cached clone
+```
+
+A `name` containing `/` is treated as `owner/repo` instead of a skill name:
+unlinks every skill/command sourced from it, drops its `skillset.yaml` entry
+(if any), and deletes the cached clone from `~/.cache/skillset/repos/`.
+
 ### Search cached skills
 
 ```bash

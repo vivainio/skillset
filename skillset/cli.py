@@ -204,7 +204,10 @@ def clean(
 @app.command()
 def remove(
     name: Annotated[
-        str | None, typer.Argument(help="Skill name or glob (e.g. bs-%)")
+        str | None,
+        typer.Argument(
+            help="Skill name or glob (e.g. bs-%), or owner/repo to remove a whole repo"
+        ),
     ] = None,
     global_: Annotated[
         bool,
@@ -215,7 +218,7 @@ def remove(
         typer.Option("-i", "--interactive", help="Select skills to remove with fzf"),
     ] = False,
 ) -> None:
-    """Remove a skill by name. Removes from local scope if skillset.yaml is found in path."""
+    """Remove a skill, or a whole repo (owner/repo) -- links, skillset.yaml entry, and cache."""
     cmd_remove(name=name, g=global_, interactive=interactive)
 
 

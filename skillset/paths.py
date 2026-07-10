@@ -211,6 +211,19 @@ def add_to_global_skillset(
     )
 
 
+def remove_from_skillset(config_path: Path, repo_key: str) -> bool:
+    """Remove a repo entry from a skillset.yaml file. Returns True if removed."""
+    if not config_path.exists():
+        return False
+    data = load_skillset(config_path)
+    skills = data.get("skills")
+    if not skills or repo_key not in skills:
+        return False
+    del skills[repo_key]
+    save_skillset(config_path, data)
+    return True
+
+
 def update_skillset_skills(
     config_path: Path,
     repo_key: str,

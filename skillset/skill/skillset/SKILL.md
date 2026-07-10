@@ -46,6 +46,10 @@ skillset remove zaira -g        # remove from global skills
 skillset remove ai-%            # glob pattern -- % is a shell-safe wildcard, no quoting needed
 skillset remove -i              # interactive fzf selection
 
+# Remove a whole repo -- a name containing "/" is treated as owner/repo, not a skill name:
+# unlinks every skill/command sourced from it, drops its skillset.yaml entry, deletes the cached clone
+skillset remove JuliusBrussee/caveman
+
 # List installed skills, commands, and cached repos
 skillset list
 skillset list --prune           # also remove broken symlinks
