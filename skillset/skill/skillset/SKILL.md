@@ -19,8 +19,7 @@ skillset add vivainio/agent-skills                    # all skills from repo (pr
 skillset add vivainio/agent-skills -g                  # force global install
 skillset add vivainio/agent-skills -s zaira            # only the zaira skill
 skillset add vivainio/agent-skills -s zaira -s other   # multiple specific skills
-skillset add vivainio/agent-skills -s "doc-*"          # glob pattern (quote for the shell)
-skillset add vivainio/agent-skills -s doc-%            # % is a shell-safe * alias, no quoting needed
+skillset add vivainio/agent-skills -s doc-%            # glob pattern -- % is a shell-safe wildcard, no quoting needed
 skillset add vivainio/agent-skills -p extra-skills     # skills from a subdirectory only
 skillset add https://github.com/vivainio/agent-skills
 skillset add https://github.com/vivainio/agent-skills/tree/main/extra-skills
@@ -38,14 +37,13 @@ skillset add owner/repo --fetch                         # clone/cache only, regi
 # Search skills across every cached repo and editable source (local, offline)
 skillset search jira                    # name/description contains "jira"
 skillset search jenkins build           # all terms must match (AND)
-skillset search jira-%                  # glob: name starting with "jira-" (% == * alias)
+skillset search jira-%                  # glob: name starting with "jira-"
 skillset search %config%                # glob: "config" anywhere in name or description
 
 # Remove skills
 skillset remove zaira           # remove from detected scope
 skillset remove zaira -g        # remove from global skills
-skillset remove "ai-*"          # glob pattern (quote to protect from the shell)
-skillset remove ai-%            # % alias, no quoting needed
+skillset remove ai-%            # glob pattern -- % is a shell-safe wildcard, no quoting needed
 skillset remove -i              # interactive fzf selection
 
 # List installed skills, commands, and cached repos

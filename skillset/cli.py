@@ -60,7 +60,7 @@ def add(
         typer.Option(
             "-s",
             "--skill",
-            help="Add only this skill by name or glob (repeatable); use % for * to skip quoting",
+            help="Add only this skill by name or glob (repeatable); % is a shell-safe wildcard",
         ),
     ] = None,
     subpath: Annotated[
@@ -147,7 +147,7 @@ def search(
         list[str],
         typer.Argument(
             help="Search term(s) -- all must match a skill's name or description; "
-            "supports glob wildcards, use % for * to skip quoting"
+            "% is a shell-safe wildcard"
         ),
     ],
 ) -> None:
@@ -204,7 +204,7 @@ def clean(
 @app.command()
 def remove(
     name: Annotated[
-        str | None, typer.Argument(help="Skill name or glob (e.g. bs-% or 'bs-*')")
+        str | None, typer.Argument(help="Skill name or glob (e.g. bs-%)")
     ] = None,
     global_: Annotated[
         bool,
