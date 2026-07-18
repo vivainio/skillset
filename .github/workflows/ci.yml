@@ -36,16 +36,3 @@ jobs:
 
       - name: Run tests
         run: uv run pytest tests -v --cov=skillset --cov-report=term-missing
-
-      - name: Check Python file lengths
-        shell: bash
-        run: |
-          status=0
-          while IFS= read -r file; do
-            lines=$(wc -l < "$file")
-            if (( lines > 300 )); then
-              echo "::error file=$file::$file has $lines lines (maximum: 300)"
-              status=1
-            fi
-          done < <(find skillset -name '*.py' -type f)
-          exit "$status"

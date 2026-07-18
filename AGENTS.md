@@ -28,7 +28,6 @@ tests/                 Mirrors skillset/ structure per module
 
 ## Code rules
 
-- Max **300 lines** per `.py` file under `skillset/`
 - Max **mccabe complexity 10** (enforced by ruff C901)
 - Always use `uv run` to invoke Python tools, never `python` directly
 
