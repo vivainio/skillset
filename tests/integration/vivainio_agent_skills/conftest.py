@@ -4,17 +4,25 @@ from pathlib import Path
 
 import pytest
 
+from skillset.discovery import find_skills
+from skillset.repo import get_repo_dir
+
 REPO = "vivainio/agent-skills"
 
-MAIN_SKILLS = {
-    "chat-transcript",
-    "github-release",
-    "public-github",
-    "python-project",
-    "tasks-py",
-    "zaira",
-}
-EXTRA_SKILLS = {"mspec", "vp-code-review", "zipget"}
+
+def repo_skills(subpath=None):
+    """Return skill names currently discovered in the cloned integration repo."""
+    source = get_repo_dir("vivainio", "agent-skills")
+    if subpath:
+        source /= subpath
+    return {skill.name for skill in find_skills(source)}
+
+
+def skills_outside(subpath):
+    """Return root-repo skills not contained in subpath."""
+    source = get_repo_dir("vivainio", "agent-skills")
+    excluded_root = source / subpath
+    return {skill.name for skill in find_skills(source) if not skill.is_relative_to(excluded_root)}
 
 
 @pytest.fixture

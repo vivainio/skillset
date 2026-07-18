@@ -73,6 +73,15 @@ def cmd_add(
     if repo is None:
         return
 
+    toml_key, toml_source = _reuse_registered_editable(
+        repo_dir,
+        toml_key,
+        toml_source,
+        is_editable,
+        is_local,
+        skillset_root,
+    )
+
     source_dir = repo_dir / subpath if subpath else repo_dir
     if subpath and not source_dir.is_dir():
         print(f"Path not found in repo: {subpath}")
@@ -335,6 +344,34 @@ def _ensure_toml_exists(is_editable, is_local, skillset_root):
     if not toml_path.exists():
         toml_path.parent.mkdir(parents=True, exist_ok=True)
         toml_path.write_text("skills: {}\n")
+
+
+def _reuse_registered_editable(
+    repo_dir, toml_key, toml_source, is_editable, is_local, skillset_root
+):
+    """Reuse the most specific registered editable source containing repo_dir."""
+    if not is_editable:
+        return toml_key, toml_source
+    toml_path = skillset_root / SKILLSET_CONFIG_FILE if is_local else get_global_skillset_path()
+    if not toml_path.exists():
+        return toml_key, toml_source
+    matches = []
+    for key, entry in (load_skillset(toml_path).get("skills") or {}).items():
+        if not isinstance(entry, dict) or not entry.get("editable") or not entry.get("source"):
+            continue
+        source = Path(entry["source"]).expanduser()
+        if not source.is_absolute():
+            source = toml_path.parent / source
+        source = source.resolve()
+        try:
+            repo_dir.resolve().relative_to(source)
+        except ValueError:
+            continue
+        matches.append((len(source.parts), key, entry["source"]))
+    if not matches:
+        return toml_key, toml_source
+    _, key, source = max(matches)
+    return key, source
 
 
 def _register_in_toml(

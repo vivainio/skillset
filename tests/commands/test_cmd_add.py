@@ -18,6 +18,25 @@ def test_add_from_local_path(env, source_repo, capsys):
     assert "Linked" in output
 
 
+def test_add_local_subdir_reuses_registered_editable_root(env, source_repo):
+    yaml_path = env.home / ".claude" / "skillset.yaml"
+    yaml_path.write_text(
+        "skills:\n"
+        "  owner/repo:\n"
+        "    editable: true\n"
+        f"    source: {source_repo.parent}\n"
+        "    enabled: [existing]\n"
+    )
+
+    cmd_add(repo=str(source_repo), skills=["skill-a"])
+
+    from skillset.paths import load_skillset
+
+    entries = load_skillset(yaml_path)["skills"]
+    assert list(entries) == ["owner/repo"]
+    assert set(entries["owner/repo"]["enabled"]) == {"existing", "skill-a"}
+
+
 def test_add_with_skill_filter(env, source_repo, capsys):
     cmd_add(repo=str(source_repo), skills=["skill-a"])
 
@@ -151,9 +170,7 @@ def test_add_trial(env, source_repo, capsys):
 def test_add_skill_by_name(env, source_repo, capsys):
     # Set up skillset.yaml with editable entry
     yaml_path = env.home / ".claude" / "skillset.yaml"
-    yaml_path.write_text(
-        f"skills:\n  my-lib:\n    editable: true\n    source: {source_repo}\n"
-    )
+    yaml_path.write_text(f"skills:\n  my-lib:\n    editable: true\n    source: {source_repo}\n")
 
     cmd_add(repo="skill-a")
 
@@ -201,6 +218,7 @@ def test_add_registers_in_skillset_yaml(env, source_repo, capsys):
                     cmd_add(repo="owner/repo")
 
     from skillset.paths import load_skillset
+
     data = load_skillset(yaml_path)
     assert "owner/repo" in data.get("skills", {})
 
@@ -293,11 +311,7 @@ def test_unsnapshot_clears_ref_and_flag(env, source_repo, capsys):
     """--unsnapshot drops snapshot+ref from yaml and re-links as symlinks."""
     yaml_file = env.home / ".claude" / "skillset.yaml"
     yaml_file.write_text(
-        "skills:\n"
-        "  owner/repo:\n"
-        "    snapshot: true\n"
-        "    ref: abc1234deadbeef\n"
-        "    enabled: ['*']\n"
+        "skills:\n  owner/repo:\n    snapshot: true\n    ref: abc1234deadbeef\n    enabled: ['*']\n"
     )
 
     with (

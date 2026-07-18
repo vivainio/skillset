@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 from skillset.commands import cmd_add
 
-from .conftest import EXTRA_SKILLS, MAIN_SKILLS, REPO
+from .conftest import REPO, repo_skills, skills_outside
 
 
 class TestAddFromSubpath:
@@ -14,7 +14,9 @@ class TestAddFromSubpath:
 
         skills_dir = env.home / ".claude" / "skills"
         installed = {p.name for p in skills_dir.iterdir() if p.is_dir()}
-        assert EXTRA_SKILLS.issubset(installed), f"Missing: {EXTRA_SKILLS - installed}"
+        expected = repo_skills("extra-skills")
+        assert expected
+        assert expected.issubset(installed), f"Missing: {expected - installed}"
 
     def test_subpath_does_not_install_main_skills(self, env):
         with patch("builtins.input", return_value="y"):
@@ -22,6 +24,5 @@ class TestAddFromSubpath:
 
         skills_dir = env.home / ".claude" / "skills"
         installed = {p.name for p in skills_dir.iterdir() if p.is_dir()}
-        assert not (MAIN_SKILLS & installed), (
-            f"Main skills should not be installed: {MAIN_SKILLS & installed}"
-        )
+        unexpected = skills_outside("extra-skills") & installed
+        assert not unexpected, f"Skills outside extra-skills should not be installed: {unexpected}"

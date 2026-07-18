@@ -3,13 +3,18 @@
 import os
 import subprocess
 import sys
+from contextlib import redirect_stdout
 from fnmatch import fnmatchcase
+from io import StringIO
 from pathlib import Path
 
+from skillset.commands.update_repair import report_or_repair_duplicate_sources
 from skillset.discovery import find_skills
 from skillset.linking import (
+    get_copy_source,
     has_glob,
     is_managed,
+    is_managed_copy,
     link_commands,
     link_skills,
     normalize_glob,
@@ -24,9 +29,10 @@ from skillset.paths import (
     get_global_skills_dir,
     get_global_skillset_path,
     load_skillset,
+    save_skillset,
     update_skillset_skills,
 )
-from skillset.repo import clone_or_pull, parse_repo_spec
+from skillset.repo import clone_or_pull, get_head_sha, get_repo_dir, parse_repo_spec
 
 
 def _resolve_toml_path(file, g):
@@ -58,6 +64,7 @@ def cmd_update(
     file: str | None = None,
     g: bool = False,
     new: str = "ask",
+    repair: bool = False,
 ) -> None:
     """Update from skillset.yaml -- pull repos, link enabled, unlink disabled."""
     file_path = _resolve_toml_path(file, g)
@@ -75,6 +82,8 @@ def cmd_update(
         sys.exit(1)
 
     config = load_skillset(file_path)
+    if repair and report_or_repair_duplicate_sources(config, file_path, repair=True):
+        config = load_skillset(file_path)
     _apply_links(config.get("links", {}))
 
     skills_config = config.get("skills") or {}
@@ -84,28 +93,70 @@ def cmd_update(
 
     skills_dir, commands_dir = _update_dirs(is_local, file_path)
     scope = "local" if is_local else "global"
+    unmanaged_names = set(config.get("unmanaged") or [])
     total_linked = 0
     new_skills_found: dict[str, list[str]] = {}
     new_skills_ctx: dict[str, tuple[Path, bool]] = {}
+    notices: list[str] = []
 
     for repo_key, value in skills_config.items():
-        linked = _update_entry(
-            repo_key,
-            value,
-            skills_dir,
-            commands_dir,
-            scope,
-            new_skills_found,
-            new_skills_ctx,
-            file_path,
-        )
+        output = StringIO()
+        with redirect_stdout(output):
+            linked = _update_entry(
+                repo_key,
+                value,
+                skills_dir,
+                commands_dir,
+                scope,
+                new_skills_found,
+                new_skills_ctx,
+                file_path,
+                repair,
+                unmanaged_names,
+            )
+        entry_output = output.getvalue()
+        print(entry_output, end="")
+        notices.extend(_actionable_notices(entry_output))
         total_linked += linked
 
     total_linked += _prompt_for_new_skills(
         new_skills_found, new_skills_ctx, skills_dir, file_path, new
     )
 
-    print(f"\nUpdate complete ({total_linked} skill(s) linked)")
+    if not repair:
+        report_or_repair_duplicate_sources(config, file_path)
+    _print_notice_summary(notices)
+    print(f"\nUpdate complete ({total_linked} skill(s) changed)")
+
+
+def _actionable_notices(output):
+    """Extract messages worth repeating at the end of a long update."""
+    markers = (
+        "Source not found:",
+        "Path not found",
+        "Invalid repo format:",
+        "editable requires",
+        "must be a ",
+        "already exists (not managed",
+        "Warning:",
+    )
+    return [
+        line.strip() for line in output.splitlines() if any(marker in line for marker in markers)
+    ]
+
+
+def _print_notice_summary(notices):
+    if not notices:
+        return
+    print("\n--- Update notices ---")
+    for notice in dict.fromkeys(notices):
+        print(f"  {notice}")
+    repairable = any(
+        notice.startswith("Source not found:") or "already exists (not managed" in notice
+        for notice in notices
+    )
+    if repairable:
+        print("Run 'skillset update --repair' to fix repairable configuration entries.")
 
 
 def _apply_links(links_config):
@@ -139,7 +190,18 @@ def _update_dirs(is_local, file_path):
     return root / ".claude" / "skills", root / ".claude" / "commands"
 
 
-def _update_entry(repo_key, value, skills_dir, commands_dir, scope, new_found, new_ctx, file_path):
+def _update_entry(
+    repo_key,
+    value,
+    skills_dir,
+    commands_dir,
+    scope,
+    new_found,
+    new_ctx,
+    file_path,
+    repair,
+    unmanaged_names,
+):
     """Update a single entry. Returns count of linked skills."""
     if not isinstance(value, dict):
         print(f"\nSkipping {repo_key}: entry must be a sub-table")
@@ -153,6 +215,8 @@ def _update_entry(repo_key, value, skills_dir, commands_dir, scope, new_found, n
         new_found,
         new_ctx,
         file_path,
+        repair,
+        unmanaged_names,
     )
 
 
@@ -165,6 +229,8 @@ def _update_dict_entry(
     new_found,
     new_ctx,
     file_path,
+    repair,
+    unmanaged_names,
 ):
     """Update a sub-table entry with enabled/disabled lists."""
     if value.get("snapshot"):
@@ -188,7 +254,7 @@ def _update_dict_entry(
         print(f"\nSkipping {repo_key}: 'disabled' must be a list")
         return 0
 
-    source_dir, repo_dir, owner, repo_name = _resolve_update_source(
+    source_dir, repo_dir, owner, repo_name, updated = _resolve_update_source(
         repo_key,
         editable,
         source_str,
@@ -227,6 +293,9 @@ def _update_dict_entry(
         repo_key,
         new_found,
         new_ctx,
+        updated,
+        file_path if repair else None,
+        unmanaged_names,
     )
 
     if not editable:
@@ -266,7 +335,9 @@ def _resolve_update_source(repo_key, editable, source_str, path_str, file_path, 
         owner, repo_name = parse_repo_spec(repo_key)
     except ValueError as e:
         print(f"  {e}")
-        return None, None, None, None
+        return None, None, None, None, set()
+    cached_dir = get_repo_dir(owner, repo_name)
+    old_head = get_head_sha(cached_dir) if cached_dir.exists() else None
     repo_dir = clone_or_pull(owner, repo_name, ref_str)
     last = _last_commit_info(repo_dir)
     if last:
@@ -274,8 +345,34 @@ def _resolve_update_source(repo_key, editable, source_str, path_str, file_path, 
     source_dir = repo_dir / path_str if path_str else repo_dir
     if path_str and not source_dir.is_dir():
         print(f"  Path not found in repo: {path_str}")
-        return None, None, None, None
-    return source_dir, repo_dir, owner, repo_name
+        return None, None, None, None, set()
+    updated = _changed_skill_names(repo_dir, source_dir, old_head)
+    return source_dir, repo_dir, owner, repo_name, updated
+
+
+def _changed_skill_names(repo_dir, source_dir, old_head):
+    """Return skills changed by the pull, or None for a newly cloned repo."""
+    new_head = get_head_sha(repo_dir)
+    if old_head is None or new_head is None:
+        return None
+    if old_head == new_head:
+        return set()
+    try:
+        result = subprocess.run(
+            ["git", "diff", "--name-only", old_head, new_head],
+            cwd=repo_dir,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return set()
+    changed = {repo_dir / path for path in result.stdout.splitlines()}
+    return {
+        skill.name
+        for skill in find_skills(source_dir)
+        if any(path == skill or skill in path.parents for path in changed)
+    }
 
 
 def _resolve_editable_source(repo_key, source_str, path_str, file_path, owner, repo_name):
@@ -287,13 +384,11 @@ def _resolve_editable_source(repo_key, source_str, path_str, file_path, owner, r
     """
     if not source_str:
         print(f"\n{repo_key}: editable requires 'source' path")
-        return None, None, None, None
+        return None, None, None, None, set()
     print(f"\nUpdating {repo_key} (editable)...")
     expanded = Path(source_str).expanduser()
     base_dir = (
-        expanded.resolve()
-        if expanded.is_absolute()
-        else (file_path.parent / expanded).resolve()
+        expanded.resolve() if expanded.is_absolute() else (file_path.parent / expanded).resolve()
     )
     source_dir = base_dir / path_str if path_str else base_dir
     if not source_dir.is_dir():
@@ -301,8 +396,8 @@ def _resolve_editable_source(repo_key, source_str, path_str, file_path, owner, r
             print(f"  Path not found: {path_str} in {source_str}")
         else:
             print(f"  Source not found: {source_str}")
-        return None, None, None, None
-    return source_dir, base_dir, owner, repo_name
+        return None, None, None, None, set()
+    return source_dir, base_dir, owner, repo_name, set()
 
 
 def _update_lists(
@@ -317,6 +412,9 @@ def _update_lists(
     repo_key,
     new_found,
     new_ctx,
+    updated,
+    repair_file,
+    unmanaged_names,
 ):
     """Link enabled (minus missing), unlink disabled, report new untracked skills."""
     new = available_names - tracked
@@ -325,30 +423,72 @@ def _update_lists(
         new_ctx[repo_key] = (source_dir, use_copy)
 
     to_link = enabled_declared & available_names
+    existing = {name for name in to_link if is_managed(skills_dir / name)}
+    to_link = _repair_unmanaged(to_link, skills_dir, repair_file, unmanaged_names)
+
     total = 0
     if to_link:
         linked = link_skills(source_dir, skills_dir, only=to_link, copy=use_copy)
-        total = len(linked)
+        changed = (set(linked) - existing) | ((updated or set()) & existing)
+        total = len(changed)
         for name in sorted(linked):
-            print(f"  + {name}")
+            if name not in existing:
+                print(f"  + {name}")
+            elif updated is not None and name in updated:
+                print(f"  ~ {name} (updated)")
 
     # Commands come along for the ride whenever we link anything from the source.
     link_commands(source_dir, commands_dir, copy=use_copy)
 
     for skill_name in sorted(disabled_set):
         skill_path = skills_dir / skill_name
-        if skill_path.exists() and is_managed(skill_path):
+        if _is_managed_from(skill_path, source_dir):
             remove_managed(skill_path)
-            print(f"  - {skill_name} (excluded)")
 
     # Clean up stale links for skills that were enabled but no longer exist in source.
     for skill_name in sorted(enabled_declared - available_names):
         skill_path = skills_dir / skill_name
-        if is_managed(skill_path):
+        if _is_managed_from(skill_path, source_dir):
             remove_managed(skill_path)
             print(f"  - {skill_name} (removed from source)")
 
     return total
+
+
+def _repair_unmanaged(to_link, skills_dir, repair_file, unmanaged_names):
+    to_link -= unmanaged_names
+    unmanaged = {
+        name
+        for name in to_link
+        if (skills_dir / name).exists() and not is_managed(skills_dir / name)
+    }
+    if repair_file and unmanaged:
+        _record_unmanaged(repair_file, unmanaged)
+        unmanaged_names |= unmanaged
+        for name in sorted(unmanaged):
+            print(f"  Marked {name} unmanaged: preserving existing destination")
+        to_link -= unmanaged
+    return to_link
+
+
+def _record_unmanaged(file_path, names):
+    config = load_skillset(file_path)
+    config["unmanaged"] = sorted(set(config.get("unmanaged") or []) | names)
+    save_skillset(file_path, config)
+
+
+def _is_managed_from(skill_path, source_dir):
+    """Return whether a managed skill points into this config entry's source."""
+    if not is_managed(skill_path):
+        return False
+    source = get_copy_source(skill_path) if is_managed_copy(skill_path) else skill_path.resolve()
+    if source is None:
+        return False
+    try:
+        Path(source).resolve().relative_to(source_dir.resolve())
+    except ValueError:
+        return False
+    return True
 
 
 def _collect_new_skill_decisions(names, source_dir, skills_dir, use_copy, mode="ask"):

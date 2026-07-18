@@ -171,6 +171,9 @@ skillset init -g        # create ~/.claude/skillset.yaml (global)
 Manage skills declaratively in a `skillset.yaml` file — globally at `~/.claude/skillset.yaml`, or per-project at your repo root. Each entry under `skills:` is keyed by `owner/repo`:
 
 ```yaml
+# names installed outside skillset; update never replaces or removes them
+unmanaged: [zenkins]
+
 skills:
   # all skills from repo
   vivainio/agent-skills:
@@ -222,6 +225,7 @@ skillset update -g                           # apply global ~/.claude/skillset.y
 skillset update --file path/to/skillset.yaml # apply a specific file
 skillset update -y                           # accept all new skills without prompting
 skillset update -n                           # ignore all new skills without prompting
+skillset update --repair                     # repair duplicate or missing editable sources
 ```
 
 ## How it works

@@ -172,13 +172,17 @@ def update(
         bool,
         typer.Option("-n", "--no", help="Ignore all new skills without prompting"),
     ] = False,
+    repair: Annotated[
+        bool,
+        typer.Option("--repair", help="Repair duplicate or missing editable repository sources"),
+    ] = False,
 ) -> None:
     """Update skills from skillset.yaml -- pull repos, link enabled, unlink disabled."""
     if yes and no:
         typer.echo("--yes and --no are mutually exclusive", err=True)
         raise typer.Exit(1)
     new = "yes" if yes else "no" if no else "ask"
-    cmd_update(file=file, g=global_, new=new)
+    cmd_update(file=file, g=global_, new=new, repair=repair)
 
 
 @app.command()

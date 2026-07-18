@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 from skillset.commands import cmd_add
 
-from .conftest import MAIN_SKILLS, REPO
+from .conftest import REPO, repo_skills
 
 
 class TestAddAllSkills:
@@ -14,7 +14,9 @@ class TestAddAllSkills:
 
         skills_dir = env.home / ".claude" / "skills"
         installed = {p.name for p in skills_dir.iterdir() if p.is_dir()}
-        assert MAIN_SKILLS.issubset(installed), f"Missing skills: {MAIN_SKILLS - installed}"
+        expected = repo_skills()
+        assert expected
+        assert expected.issubset(installed), f"Missing skills: {expected - installed}"
 
     def test_add_all_reports_linked(self, env, capsys):
         with patch("builtins.input", return_value="y"):

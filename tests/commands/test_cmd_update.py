@@ -6,6 +6,7 @@ from unittest.mock import patch
 import pytest
 
 from skillset.commands import cmd_update
+from skillset.commands.update import _changed_skill_names
 
 
 def test_no_file_exits(env):
@@ -88,7 +89,7 @@ def test_sync_all_disabled_links_nothing(env, source_repo, capsys):
         cmd_update()
 
     output = capsys.readouterr().out
-    assert "Update complete (0 skill(s) linked)" in output
+    assert "Update complete (0 skill(s) changed)" in output
     assert "New skills detected" not in output
 
 
@@ -154,14 +155,97 @@ def test_sync_removes_excluded_skills(env, source_repo, capsys):
 
     assert not (skills_dir / "skill-b").exists()
     output = capsys.readouterr().out
-    assert "excluded" in output
+    assert "skill-b" not in output
+
+
+def test_sync_does_not_remove_excluded_skill_owned_by_other_source(env, source_repo, tmp_path):
+    other_source = tmp_path / "other-source"
+    other_skill = other_source / "skill-b"
+    other_skill.mkdir(parents=True)
+    (other_skill / "SKILL.md").write_text("# other skill-b\n")
+    skills_dir = env.home / ".claude" / "skills"
+    skills_dir.mkdir(parents=True)
+    installed = skills_dir / "skill-b"
+    installed.symlink_to(other_skill)
+
+    yaml_file = env.home / ".claude" / "skillset.yaml"
+    yaml_file.write_text(
+        "skills:\n  owner/repo:\n    enabled: [skill-a]\n    disabled: [skill-b]\n"
+    )
+
+    with patch("skillset.commands.update.clone_or_pull", return_value=source_repo):
+        cmd_update()
+
+    assert installed.is_symlink()
+    assert installed.resolve() == other_skill
+
+
+def test_sync_reports_only_skills_changed_by_pull(env, source_repo, capsys):
+    skills_dir = env.home / ".claude" / "skills"
+    skills_dir.mkdir(parents=True)
+    for name in ("skill-a", "skill-b"):
+        (skills_dir / name).symlink_to(source_repo / name)
+
+    yaml_file = env.home / ".claude" / "skillset.yaml"
+    yaml_file.write_text("skills:\n  owner/repo:\n    enabled: ['*']\n")
+
+    resolved = (source_repo, source_repo, "owner", "repo", {"skill-a"})
+    with patch("skillset.commands.update._resolve_update_source", return_value=resolved):
+        cmd_update()
+
+    output = capsys.readouterr().out
+    assert "~ skill-a (updated)" in output
+    assert "skill-b" not in output
+
+
+def test_changed_skill_names_maps_git_changes_to_skill_dirs(source_repo):
+    subprocess.run(["git", "init", "-q"], cwd=source_repo, check=True)
+    subprocess.run(["git", "add", "."], cwd=source_repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-qm",
+            "first",
+        ],
+        cwd=source_repo,
+        check=True,
+    )
+    old_head = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=source_repo,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    (source_repo / "skill-a" / "SKILL.md").write_text("# changed\n")
+    (source_repo / "commands" / "do-thing.md").write_text("# changed command\n")
+    subprocess.run(["git", "add", "."], cwd=source_repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-qm",
+            "second",
+        ],
+        cwd=source_repo,
+        check=True,
+    )
+
+    assert _changed_skill_names(source_repo, source_repo, old_head) == {"skill-a"}
 
 
 def test_sync_editable(env, source_repo, capsys):
     yaml_file = env.home / ".claude" / "skillset.yaml"
-    yaml_file.write_text(
-        f"skills:\n  my-lib:\n    editable: true\n    source: {source_repo}\n"
-    )
+    yaml_file.write_text(f"skills:\n  my-lib:\n    editable: true\n    source: {source_repo}\n")
 
     cmd_update()
     output = capsys.readouterr().out
@@ -179,13 +263,39 @@ def test_sync_editable_missing_source(env, capsys):
 
 def test_sync_editable_source_not_found(env, capsys):
     yaml_file = env.home / ".claude" / "skillset.yaml"
-    yaml_file.write_text(
-        "skills:\n  my-lib:\n    editable: true\n    source: /nonexistent\n"
-    )
+    yaml_file.write_text("skills:\n  my-lib:\n    editable: true\n    source: /nonexistent\n")
 
     cmd_update()
     output = capsys.readouterr().out
     assert "Source not found" in output
+    assert output.count("Source not found") == 2
+    assert "--- Update notices ---" in output
+    assert "skillset update --repair" in output
+
+
+def test_repair_disables_unmanaged_destination_without_removing_it(env, source_repo, capsys):
+    skills_dir = env.home / ".claude" / "skills"
+    unmanaged = skills_dir / "skill-a"
+    unmanaged.mkdir(parents=True)
+    (unmanaged / "SKILL.md").write_text("# user-owned\n")
+    yaml_file = env.home / ".claude" / "skillset.yaml"
+    yaml_file.write_text("skills:\n  owner/repo:\n    enabled: ['*']\n")
+
+    with patch("skillset.commands.update.clone_or_pull", return_value=source_repo):
+        cmd_update(repair=True)
+
+    from skillset.paths import load_skillset
+
+    config = load_skillset(yaml_file)
+    assert config["unmanaged"] == ["skill-a"]
+    assert "disabled" not in config["skills"]["owner/repo"]
+    assert unmanaged.is_dir()
+    assert not unmanaged.is_symlink()
+    assert "Marked skill-a unmanaged" in capsys.readouterr().out
+
+    with patch("skillset.commands.update.clone_or_pull", return_value=source_repo):
+        cmd_update()
+    assert "skill-a" not in capsys.readouterr().out
 
 
 def test_sync_invalid_value_type(env, capsys):
@@ -204,7 +314,7 @@ def test_sync_with_path(env, source_repo, capsys):
     (skill / "SKILL.md").write_text("# nested\n")
 
     yaml_file = env.home / ".claude" / "skillset.yaml"
-    yaml_file.write_text(f"skills:\n  owner/repo:\n    path: sub\n")
+    yaml_file.write_text("skills:\n  owner/repo:\n    path: sub\n")
 
     with patch("skillset.commands.update.clone_or_pull", return_value=source_repo):
         cmd_update()
@@ -227,7 +337,11 @@ def test_sync_path_not_found_in_repo(env, source_repo, capsys):
 def test_sync_editable_path_not_found(env, source_repo, capsys):
     yaml_file = env.home / ".claude" / "skillset.yaml"
     yaml_file.write_text(
-        f"skills:\n  my-lib:\n    editable: true\n    source: {source_repo}\n    path: nonexistent\n"
+        "skills:\n"
+        "  my-lib:\n"
+        "    editable: true\n"
+        f"    source: {source_repo}\n"
+        "    path: nonexistent\n"
     )
 
     cmd_update()
