@@ -6,12 +6,13 @@ from unittest.mock import patch
 from skillset.repo import clone_or_pull
 
 
-def test_clones_new_repo(home_dir):
+def test_clones_new_repo(home_dir, monkeypatch):
+    monkeypatch.delenv("XDG_DATA_HOME", raising=False)
     with patch("skillset.repo.subprocess.run") as mock_run:
         mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
         result = clone_or_pull("owner", "repo")
 
-    expected = home_dir / ".cache" / "skillset" / "repos" / "owner" / "repo"
+    expected = home_dir / ".local" / "share" / "skillset" / "repos" / "owner" / "repo"
     assert result == expected
     assert mock_run.call_count == 1
     args = mock_run.call_args[0][0]
@@ -48,7 +49,8 @@ def test_pull_failure_warns(home_dir, capsys):
     assert "Warning" in output
 
 
-def test_clone_ssh_fallback(home_dir):
+def test_clone_ssh_fallback(home_dir, monkeypatch):
+    monkeypatch.delenv("XDG_DATA_HOME", raising=False)
     with patch("skillset.repo.subprocess.run") as mock_run:
         # First call (HTTPS) fails with auth error, second (SSH) succeeds
         mock_run.side_effect = [
@@ -57,7 +59,7 @@ def test_clone_ssh_fallback(home_dir):
         ]
         result = clone_or_pull("owner", "repo")
 
-    expected = home_dir / ".cache" / "skillset" / "repos" / "owner" / "repo"
+    expected = home_dir / ".local" / "share" / "skillset" / "repos" / "owner" / "repo"
     assert result == expected
     assert mock_run.call_count == 2
     # Second call should use SSH URL

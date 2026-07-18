@@ -19,11 +19,11 @@ from skillset.paths import (
     add_to_skillset,
     ensure_global_skills_symlinks,
     find_skillset_root,
-    get_cache_dir,
     get_global_commands_dir,
     get_global_skills_dir,
     get_global_skillset_path,
     get_local_skillset_path,
+    get_repo_roots,
     load_skillset,
     set_skillset_ref,
     set_skillset_snapshot,
@@ -312,11 +312,13 @@ def _print_linked(kind, linked, use_copy, target_dir):
 
 def _record_install(repo_dir, subpath, use_copy, is_local, trial, skills):
     """Record install options in manifest."""
-    try:
-        rel = repo_dir.relative_to(get_cache_dir())
-        repo_key = str(rel)
-    except ValueError:
-        repo_key = str(repo_dir)
+    repo_key = str(repo_dir)
+    for root in get_repo_roots():
+        try:
+            repo_key = str(repo_dir.relative_to(root))
+            break
+        except ValueError:
+            continue
     if trial:
         trial_value = True
     elif skills:

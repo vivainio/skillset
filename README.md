@@ -132,7 +132,7 @@ skillset remove JuliusBrussee/caveman   # remove its linked skills, skillset.yam
 
 A `name` containing `/` is treated as `owner/repo` instead of a skill name:
 unlinks every skill/command sourced from it, drops its `skillset.yaml` entry
-(if any), and deletes the cached clone from `~/.cache/skillset/repos/`.
+(if any), and deletes the stored clone from the platform data directory.
 
 ### Search cached skills
 
@@ -158,6 +158,21 @@ before.
 skillset list           # list all installed skills, commands, and cached repos
 skillset list --prune   # also remove broken links
 ```
+
+### Global skill profiles
+
+Save and switch between snapshots of the currently active global skills:
+
+```bash
+skillset profile          # interactive menu: switch, save, or delete
+skillset profile work     # switch directly to a saved profile
+```
+
+The menu uses `fzf` when installed and otherwise shows a numbered terminal
+menu. When saving, skillset can optionally include unmanaged skills. Those
+skills are moved safely into `~/.claude/.skillset/skills/` and linked back into
+the global skills directory. Switching profiles only changes skills known to
+profiles; unrelated unmanaged skills are left untouched.
 
 ### Initialize skillset.yaml
 
@@ -232,7 +247,10 @@ skillset update --repair -y                  # repair and remove redundant clone
 ## How it works
 
 - Skills are symlinked (Linux/Mac) or junctioned (Windows) from cached repos
-- Repo cache in `~/.cache/skillset/repos/`
+- Repository sources in `~/.local/share/skillset/repos/` on Linux,
+  `~/Library/Application Support/skillset/repos/` on macOS, and
+  `%LOCALAPPDATA%\skillset\repos` on Windows. Existing clones in the legacy
+  `~/.cache/skillset/repos/` location remain supported.
 
 ## Comparison with Vercel's `npx skills`
 

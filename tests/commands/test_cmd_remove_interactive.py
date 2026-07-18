@@ -69,14 +69,14 @@ def test_interactive_empty_selection(env, source_repo, capsys):
 
 
 def test_interactive_no_managed_skills(env, capsys):
-    """When no managed skills exist, prints message and returns."""
+    """When no skills exist, prints message and returns."""
     skills_dir = env.home / ".claude" / "skills"
     skills_dir.mkdir(parents=True)
 
     cmd_remove(interactive=True)
 
     output = capsys.readouterr().out
-    assert "No managed skills" in output
+    assert "No skills" in output
 
 
 def test_interactive_no_skills_dir(env, capsys):
@@ -84,7 +84,23 @@ def test_interactive_no_skills_dir(env, capsys):
     cmd_remove(interactive=True)
 
     output = capsys.readouterr().out
-    assert "No managed skills" in output
+    assert "No skills" in output
+
+
+def test_interactive_removes_selected_unmanaged_skill(env):
+    skills_dir = env.home / ".claude" / "skills"
+    unmanaged = skills_dir / "personal"
+    unmanaged.mkdir(parents=True)
+    (unmanaged / "SKILL.md").write_text("# Personal\n")
+
+    with patch(
+        "skillset.commands.remove.fzf_select_installed_skills",
+        return_value=["personal"],
+    ) as select:
+        cmd_remove(interactive=True)
+
+    assert not unmanaged.exists()
+    assert select.call_args.args[0] == [unmanaged]
 
 
 def test_interactive_shows_scope_in_prompt(env, source_repo, capsys, monkeypatch):

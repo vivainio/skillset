@@ -1,7 +1,6 @@
 """Command handlers for removing skills."""
 
 import fnmatch
-import os
 import shutil
 import sys
 from pathlib import Path
@@ -21,15 +20,16 @@ from skillset.paths import (
     SKILLSET_CONFIG_FILE,
     abbrev,
     find_skillset_root,
-    get_cache_dir,
     get_global_commands_dir,
     get_global_skills_dir,
     get_global_skillset_path,
     get_project_skills_dir,
+    get_repo_roots,
     load_skillset,
     remove_from_skillset,
     update_skillset_skills,
 )
+from skillset.repo import get_repo_dir
 from skillset.ui import fzf_select_installed_skills
 
 
@@ -49,18 +49,7 @@ def cmd_remove(*, name: str | None = None, g: bool = False, interactive: bool = 
     )
 
     if interactive:
-        installed = (
-            [p for p in skills_dir.iterdir() if is_managed(p)] if skills_dir.exists() else []
-        )
-        if not installed:
-            print(f"No managed skills in {abbrev(skills_dir)}")
-            return
-        scope = "project" if skillset_root else "global"
-        selected = fzf_select_installed_skills(installed, prompt=f"Remove {scope} skills> ")
-        _persist_disabled(config_path, skills_dir, selected)
-        for skill_name in selected:
-            remove_managed(skills_dir / skill_name)
-            print(f"Removed {skill_name} from {abbrev(skills_dir)}")
+        _remove_interactively(skills_dir, config_path, project=bool(skillset_root))
         return
 
     if not name:
@@ -84,6 +73,27 @@ def cmd_remove(*, name: str | None = None, g: bool = False, interactive: bool = 
     else:
         print(f"'{name}' is not managed by skillset - remove manually if intended")
         sys.exit(1)
+
+
+def _remove_interactively(skills_dir: Path, config_path: Path, *, project: bool) -> None:
+    installed = (
+        [p for p in skills_dir.iterdir() if p.is_dir() or p.is_symlink()]
+        if skills_dir.exists()
+        else []
+    )
+    if not installed:
+        print(f"No skills in {abbrev(skills_dir)}")
+        return
+    scope = "project" if project else "global"
+    selected = fzf_select_installed_skills(installed, prompt=f"Remove {scope} skills> ")
+    _persist_disabled(config_path, skills_dir, selected)
+    for skill_name in selected:
+        skill_path = skills_dir / skill_name
+        if is_managed(skill_path):
+            remove_managed(skill_path)
+        else:
+            shutil.rmtree(skill_path)
+        print(f"Removed {skill_name} from {abbrev(skills_dir)}")
 
 
 def _remove_by_glob(skills_dir: Path, pattern: str, config_path: Path) -> None:
@@ -136,7 +146,7 @@ def _entry_for_source(config, config_path: Path, skill_path: Path) -> str | None
             if not root.is_absolute():
                 root = config_path.parent / root
         else:
-            root = get_cache_dir() / repo_key
+            root = get_repo_dir(*repo_key.split("/", 1))
         effective = root / entry["path"] if entry.get("path") else root
         try:
             source.relative_to(effective.resolve())
@@ -195,8 +205,7 @@ def _remove_managed_from_source(target_dir: Path, repo_key: str, kind: str) -> i
 
 def _remove_cached_repo_dir(repo_key: str) -> bool:
     """Remove the cached clone for repo_key, if present. Returns True if removed."""
-    cache_dir = get_cache_dir()
-    repo_dir = cache_dir / repo_key.replace("/", os.sep)
+    repo_dir = get_repo_dir(*repo_key.split("/", 1))
     if not repo_dir.exists():
         return False
     if is_link(repo_dir):
@@ -204,7 +213,7 @@ def _remove_cached_repo_dir(repo_key: str) -> bool:
     else:
         shutil.rmtree(repo_dir)
     parent = repo_dir.parent
-    if parent.exists() and parent != cache_dir and not any(parent.iterdir()):
+    if parent.exists() and parent not in get_repo_roots() and not any(parent.iterdir()):
         parent.rmdir()
     print(f"Removed cached repo {abbrev(repo_dir)}")
     return True
@@ -278,13 +287,10 @@ def _clean_trial_repo(repo_key: str, opts: dict, manifest: dict) -> int:
 def _remove_cached_repo(repo_key: str, manifest: dict) -> None:
     """Remove cached repo if no other manifest entries reference it."""
     remaining_keys = set(manifest.keys())
-    cache_dir = get_cache_dir()
-    repo_dir = cache_dir / repo_key.replace("/", os.sep)
+    repo_dir = get_repo_dir(*repo_key.split("/", 1))
     if not repo_dir.exists():
         return
-    try:
-        repo_dir.relative_to(cache_dir)
-    except ValueError:
+    if not any(repo_dir.is_relative_to(root) for root in get_repo_roots()):
         return
     if any(k.startswith(repo_key) for k in remaining_keys):
         return

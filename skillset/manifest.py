@@ -2,7 +2,7 @@
 
 import json
 
-from skillset.paths import get_cache_dir
+from skillset.paths import get_cache_dir, get_legacy_cache_dir
 
 
 def get_manifest_path():
@@ -15,6 +15,9 @@ def load_manifest() -> dict:
     path = get_manifest_path()
     if path.exists():
         return json.loads(path.read_text())
+    legacy = get_legacy_cache_dir() / "manifest.json"
+    if legacy.exists():
+        return json.loads(legacy.read_text())
     return {}
 
 

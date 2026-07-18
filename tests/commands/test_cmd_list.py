@@ -124,7 +124,23 @@ def test_manual_skill(env, capsys):
 
     cmd_list()
     output = capsys.readouterr().out
-    assert "(manual)" in output
+    assert "Unmanaged:" in output
+
+
+def test_profile_stored_skill_is_listed_as_unmanaged(env, capsys):
+    skills_dir = env.home / ".claude" / "skills"
+    stored = env.home / ".claude" / ".skillset" / "skills" / "personal"
+    stored.mkdir(parents=True)
+    (stored / "SKILL.md").write_text("# personal\n")
+    skills_dir.mkdir(parents=True)
+    (skills_dir / "personal").symlink_to(stored)
+
+    cmd_list()
+
+    output = capsys.readouterr().out
+    assert "Unmanaged:" in output
+    assert "personal" in output
+    assert ".skillset/skills" not in output
 
 
 def test_trial_skill_tagged(env, source_repo, capsys):

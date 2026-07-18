@@ -29,7 +29,6 @@ tests/                 Mirrors skillset/ structure per module
 ## Code rules
 
 - Max **mccabe complexity 10** (enforced by ruff C901)
-- Always use `uv run` to invoke Python tools, never `python` directly
 
 ## Testing
 
@@ -41,8 +40,8 @@ are special cases not covered by `/unit-test`.
 
 ```bash
 bash test.sh                                  # all checks at once
-uv run ruff check skillset                    # lint + complexity
-uv run ruff format --check skillset           # format
-uv run pytest tests/ --ignore=tests/integration -q  # unit tests
-uv run pytest tests/integration -q            # integration tests
+ruff check skillset                           # lint + complexity
+ruff format --check skillset                  # format
+pytest tests/ --ignore=tests/integration -q   # unit tests
+pytest tests/integration -q                   # integration tests
 ```

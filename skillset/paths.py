@@ -4,6 +4,7 @@ The on-disk config is YAML, loaded with ruamel.yaml in round-trip mode so
 hand-written comments and structure survive tool edits.
 """
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -12,6 +13,7 @@ from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedSeq
 
 IS_WINDOWS = sys.platform == "win32"
+IS_MACOS = sys.platform == "darwin"
 CLAUDE_SETTINGS_FILE = ".claude/settings.json"
 SKILLSET_CONFIG_FILE = "skillset.yaml"
 
@@ -22,8 +24,24 @@ _yaml.indent(mapping=2, sequence=4, offset=2)
 
 
 def get_cache_dir() -> Path:
-    """Get the directory where repos are cached."""
+    """Get the durable directory where repository sources are stored."""
+    if IS_WINDOWS:
+        base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
+    elif IS_MACOS:
+        base = Path.home() / "Library" / "Application Support"
+    else:
+        base = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share"))
+    return base / "skillset" / "repos"
+
+
+def get_legacy_cache_dir() -> Path:
+    """Get the former repository cache directory."""
     return Path.home() / ".cache" / "skillset" / "repos"
+
+
+def get_repo_roots() -> list[Path]:
+    """Return repository roots, preferring the durable location."""
+    return [get_cache_dir(), get_legacy_cache_dir()]
 
 
 def get_global_skills_dir() -> Path:
@@ -117,6 +135,16 @@ def get_project_commands_dir() -> Path | None:
 def get_global_skillset_path() -> Path:
     """Get the path to the global skillset.yaml."""
     return Path.home() / ".claude" / SKILLSET_CONFIG_FILE
+
+
+def get_profiles_path() -> Path:
+    """Get the global profile configuration path."""
+    return Path.home() / ".claude" / ".skillset" / "profiles.yaml"
+
+
+def get_profile_store_dir() -> Path:
+    """Get the private store for adopted unmanaged skills."""
+    return Path.home() / ".claude" / ".skillset" / "skills"
 
 
 def get_local_skillset_path() -> Path | None:

@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 from skillset.linking import is_link
-from skillset.paths import get_cache_dir
+from skillset.paths import get_repo_roots
 from skillset.repo import (
     clone_or_pull,
     clone_to_temp,
@@ -91,18 +91,19 @@ def _resolve_source(repo, interactive, skills, subpath, no_cache, ref=None):
 
 def _pick_repo_interactively() -> str | None:
     """Use fzf to pick a cached repo. Returns repo spec or None."""
-    cache_dir = get_cache_dir()
-    repos = []
-    if cache_dir.exists():
+    repos = set()
+    for cache_dir in get_repo_roots():
+        if not cache_dir.exists():
+            continue
         for owner_dir in sorted(cache_dir.iterdir()):
             if owner_dir.is_dir():
                 for repo_dir in sorted(owner_dir.iterdir()):
                     if repo_dir.is_dir():
-                        repos.append(f"{owner_dir.name}/{repo_dir.name}")
+                        repos.add(f"{owner_dir.name}/{repo_dir.name}")
     if not repos:
         print("No repos cached. Run 'skillset add owner/repo' first.")
         sys.exit(1)
-    selected = fzf_select(repos, prompt="Repo> ")
+    selected = fzf_select(sorted(repos), prompt="Repo> ")
     return selected[0] if selected else None
 
 

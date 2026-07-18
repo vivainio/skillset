@@ -5,7 +5,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from skillset.paths import get_cache_dir
+from skillset.paths import get_cache_dir, get_legacy_cache_dir
 
 
 def _git_env() -> dict[str, str]:
@@ -52,8 +52,12 @@ def parse_github_url(url: str) -> tuple[str, str, str | None, str | None] | None
 
 
 def get_repo_dir(owner: str, repo: str) -> Path:
-    """Get the cache directory for a repo."""
-    return get_cache_dir() / owner / repo
+    """Get a repo directory, retaining an existing legacy clone when present."""
+    current = get_cache_dir() / owner / repo
+    legacy = get_legacy_cache_dir() / owner / repo
+    if current.exists() or current.is_symlink() or not (legacy.exists() or legacy.is_symlink()):
+        return current
+    return legacy
 
 
 def clone_or_pull(owner: str, repo: str, ref: str | None = None) -> Path:

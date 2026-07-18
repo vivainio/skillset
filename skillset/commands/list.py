@@ -16,11 +16,12 @@ from skillset.manifest import load_manifest
 from skillset.paths import (
     abbrev,
     find_skillset_root,
-    get_cache_dir,
     get_global_commands_dir,
     get_global_skills_dir,
+    get_profile_store_dir,
     get_project_commands_dir,
     get_project_skills_dir,
+    get_repo_roots,
 )
 
 
@@ -78,7 +79,7 @@ def _print_grouped(
 def _resolve_target_dir(item: Path, is_link_fn, broken: list[Path]) -> str | None:
     """Resolve display target directory for a skill/command item."""
     if not is_link_fn(item):
-        return "(manual)"
+        return "Unmanaged"
     if is_managed_copy(item):
         source = get_copy_source(item)
         return abbrev(source) if source else "(copied)"
@@ -86,6 +87,8 @@ def _resolve_target_dir(item: Path, is_link_fn, broken: list[Path]) -> str | Non
     if not resolved.exists():
         broken.append(item)
         return None
+    if resolved.parent == get_profile_store_dir().resolve():
+        return "Unmanaged"
     return abbrev(resolved.parent)
 
 
@@ -201,11 +204,14 @@ def cmd_list(*, prune: bool = False, available: bool = False) -> None:
     if project_commands_dir:
         pg(project_commands, lambda p: p.is_symlink(), "Project commands", project_commands_dir)
 
-    cache_dir = get_cache_dir()
-    repos = _list_repos(cache_dir)
-    if repos:
-        _print_repos(cache_dir, repos)
+    repo_groups = [(root, _list_repos(root)) for root in get_repo_roots()]
+    for root, repos in repo_groups:
+        if repos:
+            _print_repos(root, repos)
 
-    has_anything = global_skills or project_skills or global_commands or project_commands or repos
+    has_repos = any(repos for _, repos in repo_groups)
+    has_anything = (
+        global_skills or project_skills or global_commands or project_commands or has_repos
+    )
     if not has_anything:
         print("No skills, commands, or repos found")

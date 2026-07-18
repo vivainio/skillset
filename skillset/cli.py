@@ -10,6 +10,7 @@ from skillset.commands import (
     cmd_init,
     cmd_install_skills,
     cmd_list,
+    cmd_profile,
     cmd_remove,
     cmd_search,
     cmd_update,
@@ -139,6 +140,17 @@ def add(
 def install_skills() -> None:
     """Install skillset's own global usage-guide skill."""
     cmd_install_skills()
+
+
+@app.command()
+def profile(
+    name: Annotated[
+        str | None,
+        typer.Argument(help="Profile to activate; omit to open the interactive menu"),
+    ] = None,
+) -> None:
+    """Save, switch, and delete global skill profiles."""
+    cmd_profile(name=name)
 
 
 @app.command()

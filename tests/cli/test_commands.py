@@ -50,6 +50,18 @@ def test_remove_invokes_cmd_remove():
         mock.assert_called_once_with(name="skill-a", g=False, interactive=False)
 
 
+def test_profile_invokes_cmd_profile():
+    with patch("skillset.cli.cmd_profile") as mock:
+        runner.invoke(app, ["profile", "work"])
+        mock.assert_called_once_with(name="work")
+
+
+def test_profile_without_name_opens_menu():
+    with patch("skillset.cli.cmd_profile") as mock:
+        runner.invoke(app, ["profile"])
+        mock.assert_called_once_with(name=None)
+
+
 def test_add_interactive_flag():
     with patch("skillset.cli.cmd_add") as mock:
         runner.invoke(app, ["add", "-i"])

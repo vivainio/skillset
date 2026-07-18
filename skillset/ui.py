@@ -1,5 +1,6 @@
 """UI helpers — prompts, local path handling, fzf integration."""
 
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -9,10 +10,18 @@ from skillset.linking import (
     create_dir_link,
     get_copy_source,
     is_link,
+    is_managed,
     is_managed_copy,
     remove_link,
 )
-from skillset.paths import abbrev, get_cache_dir, get_global_skillset_path, load_skillset
+from skillset.paths import (
+    abbrev,
+    get_cache_dir,
+    get_global_skillset_path,
+    get_profile_store_dir,
+    get_repo_roots,
+    load_skillset,
+)
 
 
 def is_local_path(spec: str) -> bool:
@@ -72,21 +81,23 @@ def _search_editable_sources(skill_name, matches, seen_dirs):
 
 def _search_cached_repos(skill_name, matches, seen_dirs):
     """Search cached repos for a skill."""
-    cache_dir = get_cache_dir()
-    if not cache_dir.exists():
-        return
-    for owner_dir in sorted(cache_dir.iterdir()):
-        if not owner_dir.is_dir() or owner_dir.name == "local":
+    seen_keys = set()
+    for cache_dir in get_repo_roots():
+        if not cache_dir.exists():
             continue
-        for repo_dir in sorted(owner_dir.iterdir()):
-            if not repo_dir.is_dir():
+        for owner_dir in sorted(cache_dir.iterdir()):
+            if not owner_dir.is_dir() or owner_dir.name == "local":
                 continue
-            actual_dir = repo_dir.resolve() if is_link(repo_dir) else repo_dir
-            if str(actual_dir) in seen_dirs:
-                continue
-            if _has_skill(actual_dir, skill_name):
+            for repo_dir in sorted(owner_dir.iterdir()):
                 toml_key = f"{owner_dir.name}/{repo_dir.name}"
-                matches.append((actual_dir, toml_key, None, False))
+                if not repo_dir.is_dir() or toml_key in seen_keys:
+                    continue
+                seen_keys.add(toml_key)
+                actual_dir = repo_dir.resolve() if is_link(repo_dir) else repo_dir
+                if str(actual_dir) in seen_dirs:
+                    continue
+                if _has_skill(actual_dir, skill_name):
+                    matches.append((actual_dir, toml_key, None, False))
 
 
 def _has_skill(directory: Path, skill_name: str) -> bool:
@@ -115,15 +126,45 @@ def fzf_select(
     return [line for line in result.stdout.splitlines() if line]
 
 
+def select_one(items: list[str], prompt: str = "Select") -> str | None:
+    """Select one item with fzf when available, otherwise a numbered menu."""
+    if not items:
+        return None
+    if shutil.which("fzf"):
+        selected = fzf_select(items, prompt=f"{prompt}> ")
+        return selected[0] if selected else None
+
+    for number, item in enumerate(items, start=1):
+        print(f"  {number}. {item}")
+    while True:
+        choice = input(f"\n{prompt} [1-{len(items)}]: ").strip()
+        if not choice:
+            return None
+        try:
+            index = int(choice) - 1
+        except ValueError:
+            index = -1
+        if 0 <= index < len(items):
+            return items[index]
+        print("Please enter a number from the menu.")
+
+
 def fzf_select_installed_skills(skills: list[Path], prompt: str) -> list[str]:
     """Select installed skills, grouped and labelled by their source location."""
     groups: dict[str, list[str]] = {}
     for skill in skills:
-        if is_managed_copy(skill):
+        if not is_managed(skill):
+            location = "Unmanaged"
+        elif is_managed_copy(skill):
             source = get_copy_source(skill) or "(copied)"
             location = abbrev(Path(source).expanduser().parent)
         else:
-            location = abbrev(skill.resolve().parent)
+            source_dir = skill.resolve().parent
+            location = (
+                "Unmanaged"
+                if source_dir == get_profile_store_dir().resolve()
+                else abbrev(source_dir)
+            )
         groups.setdefault(location, []).append(skill.name)
     items = [
         item

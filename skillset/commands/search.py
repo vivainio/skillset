@@ -5,7 +5,7 @@ from pathlib import Path
 
 from skillset.discovery import find_skills, parse_skill_metadata
 from skillset.linking import has_glob, is_link, normalize_glob
-from skillset.paths import get_cache_dir, get_global_skillset_path, load_skillset
+from skillset.paths import get_global_skillset_path, get_repo_roots, load_skillset
 
 
 def _editable_sources() -> list[tuple[str, Path]]:
@@ -30,19 +30,22 @@ def _editable_sources() -> list[tuple[str, Path]]:
 
 
 def _cached_repos() -> list[tuple[str, Path]]:
-    """(repo_key, dir) for every cached repo, resolving symlinks."""
-    cache_dir = get_cache_dir()
+    """(repo_key, dir) for every stored repo, resolving symlinks."""
     sources = []
-    if not cache_dir.exists():
-        return sources
-    for owner_dir in sorted(cache_dir.iterdir()):
-        if not owner_dir.is_dir() or owner_dir.name == "local":
+    seen = set()
+    for root in get_repo_roots():
+        if not root.exists():
             continue
-        for repo_dir in sorted(owner_dir.iterdir()):
-            if not repo_dir.is_dir():
+        for owner_dir in sorted(root.iterdir()):
+            if not owner_dir.is_dir() or owner_dir.name == "local":
                 continue
-            actual_dir = repo_dir.resolve() if is_link(repo_dir) else repo_dir
-            sources.append((f"{owner_dir.name}/{repo_dir.name}", actual_dir))
+            for repo_dir in sorted(owner_dir.iterdir()):
+                key = f"{owner_dir.name}/{repo_dir.name}"
+                if not repo_dir.is_dir() or key in seen:
+                    continue
+                seen.add(key)
+                actual_dir = repo_dir.resolve() if is_link(repo_dir) else repo_dir
+                sources.append((key, actual_dir))
     return sources
 
 

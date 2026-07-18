@@ -65,6 +65,10 @@ skillset update -n              # ignore all newly-discovered skills without pro
 skillset clean                  # remove all trial skills and their cached repos
 skillset clean -g               # global trial skills only
 
+# Global skill profiles
+skillset profile                # interactive switch/save/delete menu (fzf or numbered fallback)
+skillset profile work           # activate a saved profile directly
+
 # Initialize skillset.yaml
 skillset init                   # create at git root (local, project scope)
 skillset init -g                # create ~/.claude/skillset.yaml (global scope)
@@ -110,5 +114,8 @@ links:
 ## How it works
 
 - Skills/commands are symlinked (Linux/Mac) or junctioned (Windows) from cached repos, not copied, unless `--copy`/`--no-cache`/`--snapshot`.
-- Repo cache lives in `~/.cache/skillset/repos/`.
+- Repository sources live in `~/.local/share/skillset/repos/` on Linux,
+  `~/Library/Application Support/skillset/repos/` on macOS, and
+  `%LOCALAPPDATA%\skillset\repos` on Windows. Legacy
+  `~/.cache/skillset/repos/` clones remain supported.
 - `--fetch` is the way to get a repo into the cache (and registered in `skillset.yaml` with nothing enabled) purely so `skillset search` can find its skills later, without installing anything yet.

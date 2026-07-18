@@ -7,7 +7,8 @@ from pathlib import Path
 
 from skillset.discovery import find_skills
 from skillset.linking import has_glob
-from skillset.paths import abbrev, get_cache_dir, save_skillset
+from skillset.paths import abbrev, get_repo_roots, save_skillset
+from skillset.repo import get_repo_dir
 
 
 def _git_root_and_remote(source: Path) -> tuple[Path, str] | None:
@@ -105,7 +106,8 @@ def _redundant_cache_candidates(config, file_path):
         if not identity:
             continue
         root, repo_key = identity
-        cache_dir = get_cache_dir() / repo_key
+        owner, repo = repo_key.split("/", 1)
+        cache_dir = get_repo_dir(owner, repo)
         if cache_dir.exists() or cache_dir.is_symlink():
             candidates[repo_key] = root
     return list(candidates.items())
@@ -114,7 +116,8 @@ def _redundant_cache_candidates(config, file_path):
 def remove_redundant_cached_repos(candidates, answer="ask"):
     """Offer to remove repaired cached clones after editable sources are linked."""
     for repo_key, editable_root in candidates:
-        cache_dir = get_cache_dir() / repo_key
+        owner, repo = repo_key.split("/", 1)
+        cache_dir = get_repo_dir(owner, repo)
         if not cache_dir.exists() and not cache_dir.is_symlink():
             continue
         if answer == "yes":
@@ -141,8 +144,7 @@ def _remove_cache_dir(cache_dir):
     else:
         shutil.rmtree(cache_dir)
     parent = cache_dir.parent
-    cache_root = get_cache_dir()
-    if parent != cache_root and parent.exists() and not any(parent.iterdir()):
+    if parent not in get_repo_roots() and parent.exists() and not any(parent.iterdir()):
         parent.rmdir()
 
 
