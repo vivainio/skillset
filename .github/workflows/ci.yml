@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          enable-cache: true
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: uv sync --locked --dev
+
+      - name: Lint
+        run: uv run ruff check skillset
+
+      - name: Check formatting
+        run: uv run ruff format --check skillset
+
+      - name: Run tests
+        run: uv run pytest tests -v --cov=skillset --cov-report=term-missing
+
+      - name: Check Python file lengths
+        shell: bash
+        run: |
+          status=0
+          while IFS= read -r file; do
+            lines=$(wc -l < "$file")
+            if (( lines > 300 )); then
+              echo "::error file=$file::$file has $lines lines (maximum: 300)"
+              status=1
+            fi
+          done < <(find skillset -name '*.py' -type f)
+          exit "$status"
