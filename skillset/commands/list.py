@@ -42,6 +42,7 @@ def _print_grouped(
     install_dir: Path,
     trial_repos: set[str],
     prune: bool,
+    show_description_size: bool = False,
 ) -> None:
     """Print items grouped by source directory."""
     if not items:
@@ -54,7 +55,11 @@ def _print_grouped(
         if target_dir is None:
             continue
         trial_tag = " (trial)" if _is_trial_skill(item, trial_repos) else ""
-        groups.setdefault(target_dir, []).append(item.name + trial_tag)
+        size_tag = ""
+        if show_description_size:
+            _, description = parse_skill_metadata(item)
+            size_tag = f" ({len(description)} chars)"
+        groups.setdefault(target_dir, []).append(item.name + size_tag + trial_tag)
     for target_dir, names in sorted(groups.items()):
         print(f"  {target_dir}:")
         for name in sorted(names):
@@ -175,12 +180,20 @@ def cmd_list(*, prune: bool = False, available: bool = False) -> None:
     manifest = load_manifest()
     trial_repos = {k for k, v in manifest.items() if v.get("trial")}
 
-    def pg(items, fn, label, d):
-        _print_grouped(items, fn, label, d, trial_repos, prune)
+    def pg(items, fn, label, d, show_description_size=False):
+        _print_grouped(
+            items,
+            fn,
+            label,
+            d,
+            trial_repos,
+            prune,
+            show_description_size=show_description_size,
+        )
 
-    pg(global_skills, is_managed, "Global skills", global_skills_dir)
+    pg(global_skills, is_managed, "Global skills", global_skills_dir, True)
     if project_skills_dir:
-        pg(project_skills, is_managed, "Project skills", project_skills_dir)
+        pg(project_skills, is_managed, "Project skills", project_skills_dir, True)
     pg(global_commands, lambda p: p.is_symlink(), "Global commands", global_commands_dir)
     if project_commands_dir:
         pg(project_commands, lambda p: p.is_symlink(), "Project commands", project_commands_dir)

@@ -21,6 +21,33 @@ def test_lists_global_skills(env, source_repo, capsys):
     assert "skill-a" in output
 
 
+def test_lists_skill_description_size(env, source_repo, capsys):
+    skill = source_repo / "skill-a"
+    description = "Useful test skill"
+    (skill / "SKILL.md").write_text(
+        f"---\nname: skill-a\ndescription: {description}\n---\n# Skill\n"
+    )
+    skills_dir = env.home / ".claude" / "skills"
+    skills_dir.mkdir(parents=True)
+    (skills_dir / "skill-a").symlink_to(skill)
+
+    cmd_list()
+
+    output = capsys.readouterr().out
+    assert f"skill-a ({len(description)} chars)" in output
+
+
+def test_lists_zero_size_for_skill_without_description(env, source_repo, capsys):
+    skills_dir = env.home / ".claude" / "skills"
+    skills_dir.mkdir(parents=True)
+    (skills_dir / "skill-a").symlink_to(source_repo / "skill-a")
+
+    cmd_list()
+
+    output = capsys.readouterr().out
+    assert "skill-a (0 chars)" in output
+
+
 def test_lists_symlinked_skills(env, source_repo, capsys):
     skills_dir = env.home / ".claude" / "skills"
     skills_dir.mkdir(parents=True)
@@ -119,6 +146,7 @@ def test_lists_commands(env, source_repo, capsys):
     cmd_list()
     output = capsys.readouterr().out
     assert "Global commands" in output
+    assert "do-thing.md (" not in output
 
 
 def test_project_commands_listed(env, source_repo, capsys):
