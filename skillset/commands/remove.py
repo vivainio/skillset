@@ -30,7 +30,7 @@ from skillset.paths import (
     remove_from_skillset,
     update_skillset_skills,
 )
-from skillset.ui import fzf_select
+from skillset.ui import fzf_select_installed_skills
 
 
 def cmd_remove(*, name: str | None = None, g: bool = False, interactive: bool = False) -> None:
@@ -50,15 +50,13 @@ def cmd_remove(*, name: str | None = None, g: bool = False, interactive: bool = 
 
     if interactive:
         installed = (
-            sorted(p.name for p in skills_dir.iterdir() if is_managed(p))
-            if skills_dir.exists()
-            else []
+            [p for p in skills_dir.iterdir() if is_managed(p)] if skills_dir.exists() else []
         )
         if not installed:
             print(f"No managed skills in {abbrev(skills_dir)}")
             return
         scope = "project" if skillset_root else "global"
-        selected = fzf_select(installed, prompt=f"Remove {scope} skills> ")
+        selected = fzf_select_installed_skills(installed, prompt=f"Remove {scope} skills> ")
         _persist_disabled(config_path, skills_dir, selected)
         for skill_name in selected:
             remove_managed(skills_dir / skill_name)

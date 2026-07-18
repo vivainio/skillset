@@ -5,8 +5,14 @@ import sys
 from pathlib import Path
 
 from skillset.discovery import find_skills
-from skillset.linking import create_dir_link, is_link, remove_link
-from skillset.paths import get_cache_dir, get_global_skillset_path, load_skillset
+from skillset.linking import (
+    create_dir_link,
+    get_copy_source,
+    is_link,
+    is_managed_copy,
+    remove_link,
+)
+from skillset.paths import abbrev, get_cache_dir, get_global_skillset_path, load_skillset
 
 
 def is_local_path(spec: str) -> bool:
@@ -88,11 +94,17 @@ def _has_skill(directory: Path, skill_name: str) -> bool:
     return any(s.name == skill_name for s in find_skills(directory))
 
 
-def fzf_select(items: list[str], prompt: str = "Select> ") -> list[str]:
+def fzf_select(
+    items: list[str], prompt: str = "Select> ", *, preserve_order: bool = False
+) -> list[str]:
     """Run fzf for multi-select; returns selected items."""
     input_text = "\n".join(items)
+    command = ["fzf", "--multi", "--prompt", prompt]
+    if preserve_order:
+        command.append("--no-sort")
+    command.extend(["--header", "Tab to select, Enter to confirm"])
     result = subprocess.run(
-        ["fzf", "--multi", "--prompt", prompt, "--header", "Tab to select, Enter to confirm"],
+        command,
         input=input_text,
         stdout=subprocess.PIPE,
         text=True,
@@ -101,6 +113,25 @@ def fzf_select(items: list[str], prompt: str = "Select> ") -> list[str]:
         print("fzf not found or failed", file=sys.stderr)
         sys.exit(1)
     return [line for line in result.stdout.splitlines() if line]
+
+
+def fzf_select_installed_skills(skills: list[Path], prompt: str) -> list[str]:
+    """Select installed skills, grouped and labelled by their source location."""
+    groups: dict[str, list[str]] = {}
+    for skill in skills:
+        if is_managed_copy(skill):
+            source = get_copy_source(skill) or "(copied)"
+            location = abbrev(Path(source).expanduser().parent)
+        else:
+            location = abbrev(skill.resolve().parent)
+        groups.setdefault(location, []).append(skill.name)
+    items = [
+        item
+        for location in sorted(groups)
+        for item in [f"# {location}", *(f"  {name}" for name in sorted(groups[location]))]
+    ]
+    selected = fzf_select(items, prompt=prompt, preserve_order=True)
+    return [item.strip() for item in selected if not item.startswith("# ")]
 
 
 def fzf_select_skills(skills: list[Path], repo_dir: Path, installed: set[str]) -> list[str]:

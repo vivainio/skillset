@@ -44,6 +44,13 @@ def test_passes_items_and_prompt():
     assert "Pick> " in call_args[0][0]
 
 
+def test_preserve_order_disables_fzf_sorting():
+    with patch("skillset.ui.subprocess.run", return_value=_make_fzf_result("")) as mock_run:
+        fzf_select(["# source", "  skill"], preserve_order=True)
+
+    assert "--no-sort" in mock_run.call_args[0][0]
+
+
 def test_strips_empty_lines():
     with patch("skillset.ui.subprocess.run", return_value=_make_fzf_result("\nalpha\n\nbeta\n\n")):
         result = fzf_select(["alpha", "beta"])
