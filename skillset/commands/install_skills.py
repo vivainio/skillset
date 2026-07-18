@@ -7,7 +7,7 @@ from pathlib import Path
 from skillset.linking import copy_dir
 from skillset.paths import (
     abbrev,
-    ensure_copilot_skills_symlink,
+    ensure_global_skills_symlinks,
     find_skillset_root,
     get_global_skills_dir,
 )
@@ -41,5 +41,5 @@ def cmd_install_skills(*, g: bool = False) -> None:
     copy_dir(bundled, target, source_label="skillset (bundled)")
     print(f"Installed skillset skill to {abbrev(target)}")
 
-    if not is_local and ensure_copilot_skills_symlink():
-        print(f"Linked {abbrev(Path.home() / '.copilot' / 'skills')} -> {abbrev(skills_dir)}")
+    if not is_local:
+        ensure_global_skills_symlinks()

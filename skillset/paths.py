@@ -31,36 +31,38 @@ def get_global_skills_dir() -> Path:
     return Path.home() / ".claude" / "skills"
 
 
-def ensure_copilot_skills_symlink() -> bool:
-    """Link ~/.copilot/skills -> ~/.claude/skills if Copilot CLI is installed and unlinked.
+def ensure_global_skills_symlinks() -> list[Path]:
+    """Link other agents' global skill directories to Claude's.
 
-    No-ops if ~/.copilot doesn't exist, or if ~/.copilot/skills already exists
-    (as a real dir, a symlink, or a broken symlink) -- never overwrites. Returns
-    True if a new link was created.
+    Links are created only for agent directories that already exist. Existing
+    skills paths, including broken symlinks, are never overwritten.
     """
-    copilot_dir = Path.home() / ".copilot"
-    if not copilot_dir.is_dir():
-        return False
-    link_path = copilot_dir / "skills"
-    if link_path.is_symlink() or link_path.exists():
-        return False
+    home = Path.home()
+    candidates = [home / name for name in (".agents", ".codex", ".copilot")]
+    parents = [path for path in candidates if path.is_dir()]
     target = get_global_skills_dir()
-    try:
-        if IS_WINDOWS:
-            subprocess.run(
-                ["cmd", "/c", "mklink", "/J", str(link_path), str(target)],
-                check=True,
-                capture_output=True,
+    created = []
+    for parent in parents:
+        link_path = parent / "skills"
+        if link_path.is_symlink() or link_path.exists():
+            continue
+        try:
+            if IS_WINDOWS:
+                subprocess.run(
+                    ["cmd", "/c", "mklink", "/J", str(link_path), str(target)],
+                    check=True,
+                    capture_output=True,
+                )
+            else:
+                link_path.symlink_to(target)
+            created.append(link_path)
+            print(f"Linked {abbrev(link_path)} -> {abbrev(target)}")
+        except (OSError, subprocess.CalledProcessError):
+            print(
+                f"Could not link {abbrev(link_path)} -> {abbrev(target)} "
+                "-- if this persists, retry from an admin shell."
             )
-        else:
-            link_path.symlink_to(target)
-    except (OSError, subprocess.CalledProcessError):
-        print(
-            f"Could not link {abbrev(link_path)} -> {abbrev(target)} "
-            "-- if this persists, retry from an admin shell."
-        )
-        return False
-    return True
+    return created
 
 
 def get_git_root() -> Path | None:
