@@ -225,7 +225,8 @@ skillset update -g                           # apply global ~/.claude/skillset.y
 skillset update --file path/to/skillset.yaml # apply a specific file
 skillset update -y                           # accept all new skills without prompting
 skillset update -n                           # ignore all new skills without prompting
-skillset update --repair                     # repair duplicate or missing editable sources
+skillset update --repair                     # repair editable sources; offer to remove old clones
+skillset update --repair -y                  # repair and remove redundant clones without prompting
 ```
 
 ## How it works

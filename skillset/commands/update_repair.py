@@ -1,12 +1,13 @@
 """Detect and repair repositories configured both cached and editable."""
 
 import re
+import shutil
 import subprocess
 from pathlib import Path
 
 from skillset.discovery import find_skills
 from skillset.linking import has_glob
-from skillset.paths import abbrev, save_skillset
+from skillset.paths import abbrev, get_cache_dir, save_skillset
 
 
 def _git_root_and_remote(source: Path) -> tuple[Path, str] | None:
@@ -59,20 +60,22 @@ def _duplicate_groups(config, file_path):
     }
 
 
-def report_or_repair_duplicate_sources(config, file_path, repair=False):
+def report_or_repair_duplicate_sources(config, file_path, repair=False, purge_candidates=None):
     """Report duplicate cached/editable repos; optionally consolidate safe groups."""
     groups = _duplicate_groups(config, file_path)
     missing = _missing_editable_entries(config, file_path) if repair else {}
-    if not groups and not missing:
+    if not groups and not missing and not repair:
         return False
-    heading = "Configuration repair" if repair else "Duplicate repository sources"
-    print(f"\n--- {heading} ---")
+    if groups or missing:
+        heading = "Configuration repair" if repair else "Duplicate repository sources"
+        print(f"\n--- {heading} ---")
     changed = False
     for repo_key, group in groups.items():
         aliases = ", ".join(group["editable"])
         print(f"  {repo_key}: cached and editable via {aliases}")
         if repair:
-            changed |= _repair_group(config, repo_key, group)
+            repaired = _repair_group(config, repo_key, group)
+            changed |= repaired
     for key, source in missing.items():
         del config["skills"][key]
         print(f"  Removed {key}: source not found: {source}")
@@ -82,7 +85,65 @@ def report_or_repair_duplicate_sources(config, file_path, repair=False):
         print(f"  Repaired {abbrev(file_path)}")
     elif not repair:
         print("Run 'skillset update --repair' to consolidate safe duplicates.")
+    if repair and purge_candidates is not None:
+        purge_candidates.extend(_redundant_cache_candidates(config, file_path))
     return changed
+
+
+def _redundant_cache_candidates(config, file_path):
+    candidates = {}
+    for entry in (config.get("skills") or {}).values():
+        if not isinstance(entry, dict) or not entry.get("editable") or entry.get("snapshot"):
+            continue
+        source = entry.get("source")
+        if not source or entry.get("ref"):
+            continue
+        source_path = Path(source).expanduser()
+        if not source_path.is_absolute():
+            source_path = file_path.parent / source_path
+        identity = _git_root_and_remote(source_path.resolve())
+        if not identity:
+            continue
+        root, repo_key = identity
+        cache_dir = get_cache_dir() / repo_key
+        if cache_dir.exists() or cache_dir.is_symlink():
+            candidates[repo_key] = root
+    return list(candidates.items())
+
+
+def remove_redundant_cached_repos(candidates, answer="ask"):
+    """Offer to remove repaired cached clones after editable sources are linked."""
+    for repo_key, editable_root in candidates:
+        cache_dir = get_cache_dir() / repo_key
+        if not cache_dir.exists() and not cache_dir.is_symlink():
+            continue
+        if answer == "yes":
+            remove = True
+        elif answer == "ask":
+            prompt = (
+                f"Remove redundant cached clone for {repo_key}? "
+                f"(editable at {abbrev(editable_root)}) [Y/n] "
+            )
+            remove = input(prompt).strip().lower() not in ("n", "no")
+        else:
+            print(f"Redundant cached clone remains at {abbrev(cache_dir)}")
+            continue
+        if remove:
+            _remove_cache_dir(cache_dir)
+            print(f"Removed cached clone {abbrev(cache_dir)}")
+        else:
+            print(f"Kept cached clone {abbrev(cache_dir)}")
+
+
+def _remove_cache_dir(cache_dir):
+    if cache_dir.is_symlink():
+        cache_dir.unlink()
+    else:
+        shutil.rmtree(cache_dir)
+    parent = cache_dir.parent
+    cache_root = get_cache_dir()
+    if parent != cache_root and parent.exists() and not any(parent.iterdir()):
+        parent.rmdir()
 
 
 def _missing_editable_entries(config, file_path):

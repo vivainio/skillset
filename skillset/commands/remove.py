@@ -26,7 +26,9 @@ from skillset.paths import (
     get_global_skills_dir,
     get_global_skillset_path,
     get_project_skills_dir,
+    load_skillset,
     remove_from_skillset,
+    update_skillset_skills,
 )
 from skillset.ui import fzf_select
 
@@ -42,6 +44,9 @@ def cmd_remove(*, name: str | None = None, g: bool = False, interactive: bool = 
         skills_dir = skillset_root / ".claude" / "skills"
     else:
         skills_dir = get_global_skills_dir()
+    config_path = (
+        skillset_root / SKILLSET_CONFIG_FILE if skillset_root else get_global_skillset_path()
+    )
 
     if interactive:
         installed = (
@@ -54,6 +59,7 @@ def cmd_remove(*, name: str | None = None, g: bool = False, interactive: bool = 
             return
         scope = "project" if skillset_root else "global"
         selected = fzf_select(installed, prompt=f"Remove {scope} skills> ")
+        _persist_disabled(config_path, skills_dir, selected)
         for skill_name in selected:
             remove_managed(skills_dir / skill_name)
             print(f"Removed {skill_name} from {abbrev(skills_dir)}")
@@ -64,7 +70,7 @@ def cmd_remove(*, name: str | None = None, g: bool = False, interactive: bool = 
         sys.exit(1)
 
     if has_glob(name):
-        _remove_by_glob(skills_dir, name)
+        _remove_by_glob(skills_dir, name, config_path)
         return
 
     skill_path = skills_dir / name
@@ -74,6 +80,7 @@ def cmd_remove(*, name: str | None = None, g: bool = False, interactive: bool = 
         sys.exit(1)
 
     if is_managed(skill_path):
+        _persist_disabled(config_path, skills_dir, [name])
         remove_managed(skill_path)
         print(f"Removed {name} from {abbrev(skills_dir)}")
     else:
@@ -81,7 +88,7 @@ def cmd_remove(*, name: str | None = None, g: bool = False, interactive: bool = 
         sys.exit(1)
 
 
-def _remove_by_glob(skills_dir: Path, pattern: str) -> None:
+def _remove_by_glob(skills_dir: Path, pattern: str, config_path: Path) -> None:
     """Remove skills matching a glob pattern."""
     if not skills_dir.exists():
         print(f"No skills in {abbrev(skills_dir)}")
@@ -93,9 +100,52 @@ def _remove_by_glob(skills_dir: Path, pattern: str) -> None:
     if not matched:
         print(f"No managed skills matching '{pattern}' in {abbrev(skills_dir)}")
         sys.exit(1)
+    _persist_disabled(config_path, skills_dir, matched)
     for name in matched:
         remove_managed(skills_dir / name)
         print(f"Removed {name} from {abbrev(skills_dir)}")
+
+
+def _persist_disabled(config_path: Path, skills_dir: Path, names: list[str]) -> None:
+    if not config_path.exists():
+        return
+    config = load_skillset(config_path)
+    grouped: dict[str, list[str]] = {}
+    for name in names:
+        repo_key = _entry_for_source(config, config_path, skills_dir / name)
+        if repo_key:
+            grouped.setdefault(repo_key, []).append(name)
+    for repo_key, disabled in grouped.items():
+        if update_skillset_skills(config_path, repo_key, add_disabled=disabled):
+            joined = ", ".join(disabled)
+            print(f"Disabled {joined} in {abbrev(config_path)}")
+
+
+def _entry_for_source(config, config_path: Path, skill_path: Path) -> str | None:
+    source_text = _get_managed_source(skill_path)
+    if not source_text:
+        return None
+    source = Path(source_text).expanduser()
+    if source.is_absolute():
+        source = source.resolve()
+    for repo_key, entry in (config.get("skills") or {}).items():
+        if not isinstance(entry, dict):
+            continue
+        if source_text == repo_key:
+            return repo_key
+        if entry.get("editable") and entry.get("source"):
+            root = Path(entry["source"]).expanduser()
+            if not root.is_absolute():
+                root = config_path.parent / root
+        else:
+            root = get_cache_dir() / repo_key
+        effective = root / entry["path"] if entry.get("path") else root
+        try:
+            source.relative_to(effective.resolve())
+            return repo_key
+        except ValueError:
+            continue
+    return None
 
 
 def cmd_remove_repo(repo_key: str, *, g: bool = False) -> None:

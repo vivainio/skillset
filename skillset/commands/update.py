@@ -8,7 +8,10 @@ from fnmatch import fnmatchcase
 from io import StringIO
 from pathlib import Path
 
-from skillset.commands.update_repair import report_or_repair_duplicate_sources
+from skillset.commands.update_repair import (
+    remove_redundant_cached_repos,
+    report_or_repair_duplicate_sources,
+)
 from skillset.discovery import find_skills
 from skillset.linking import (
     get_copy_source,
@@ -69,6 +72,7 @@ def cmd_update(
     """Update from skillset.yaml -- pull repos, link enabled, unlink disabled."""
     file_path = _resolve_toml_path(file, g)
     is_local = file_path != get_global_skillset_path()
+    repair_answer = new
 
     # A local skillset.yaml is a declaration -- never prompt to amend it.
     # New skills are just reported; --yes/--no remain explicit overrides.
@@ -82,7 +86,10 @@ def cmd_update(
         sys.exit(1)
 
     config = load_skillset(file_path)
-    if repair and report_or_repair_duplicate_sources(config, file_path, repair=True):
+    purge_candidates = []
+    if repair and report_or_repair_duplicate_sources(
+        config, file_path, repair=True, purge_candidates=purge_candidates
+    ):
         config = load_skillset(file_path)
     _apply_links(config.get("links", {}))
 
@@ -126,6 +133,8 @@ def cmd_update(
     if not repair:
         report_or_repair_duplicate_sources(config, file_path)
     _print_notice_summary(notices)
+    if repair:
+        remove_redundant_cached_repos(purge_candidates, repair_answer)
     print(f"\nUpdate complete ({total_linked} skill(s) changed)")
 
 

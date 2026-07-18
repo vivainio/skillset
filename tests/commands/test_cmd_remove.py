@@ -4,6 +4,7 @@ import pytest
 
 from skillset.commands import cmd_remove
 from skillset.linking import copy_dir
+from skillset.paths import load_skillset
 
 
 def test_removes_symlinked_skill(env, source_repo, capsys):
@@ -24,6 +25,23 @@ def test_removes_copied_skill(env, source_repo, capsys):
 
     cmd_remove(name="skill-a")
     assert not (skills_dir / "skill-a").exists()
+
+
+def test_remove_persists_disabled_and_removes_literal_enabled(env, source_repo):
+    skills_dir = env.home / ".claude" / "skills"
+    skills_dir.mkdir(parents=True)
+    (skills_dir / "skill-a").symlink_to(source_repo / "skill-a")
+    config_path = env.home / ".claude" / "skillset.yaml"
+    config_path.write_text(
+        f"skills:\n  owner/repo:\n    editable: true\n"
+        f"    source: {source_repo}\n    enabled: [skill-a, skill-b]\n"
+    )
+
+    cmd_remove(name="skill-a")
+
+    entry = load_skillset(config_path)["skills"]["owner/repo"]
+    assert list(entry["enabled"]) == ["skill-b"]
+    assert list(entry["disabled"]) == ["skill-a"]
 
 
 def test_exits_when_skill_not_found(env):

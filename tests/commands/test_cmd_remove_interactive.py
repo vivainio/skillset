@@ -3,6 +3,7 @@
 from unittest.mock import patch
 
 from skillset.commands import cmd_remove
+from skillset.paths import load_skillset
 
 
 def test_interactive_selects_skills_to_remove(env, source_repo, capsys):
@@ -31,6 +32,25 @@ def test_interactive_removes_multiple(env, source_repo, capsys):
 
     assert not (skills_dir / "skill-a").exists()
     assert not (skills_dir / "skill-b").exists()
+
+
+def test_interactive_persists_disabled_skills(env, source_repo):
+    skills_dir = env.home / ".claude" / "skills"
+    skills_dir.mkdir(parents=True)
+    (skills_dir / "skill-a").symlink_to(source_repo / "skill-a")
+    (skills_dir / "skill-b").symlink_to(source_repo / "skill-b")
+    config_path = env.home / ".claude" / "skillset.yaml"
+    config_path.write_text(
+        f"skills:\n  owner/repo:\n    editable: true\n"
+        f"    source: {source_repo}\n    enabled: ['*']\n"
+    )
+
+    with patch("skillset.commands.remove.fzf_select", return_value=["skill-a"]):
+        cmd_remove(interactive=True)
+
+    entry = load_skillset(config_path)["skills"]["owner/repo"]
+    assert list(entry["enabled"]) == ["*"]
+    assert list(entry["disabled"]) == ["skill-a"]
 
 
 def test_interactive_empty_selection(env, source_repo, capsys):

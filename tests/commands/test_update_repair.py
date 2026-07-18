@@ -1,8 +1,12 @@
 """Tests for duplicate cached/editable repository repair."""
 
 import subprocess
+from unittest.mock import patch
 
-from skillset.commands.update_repair import report_or_repair_duplicate_sources
+from skillset.commands.update_repair import (
+    remove_redundant_cached_repos,
+    report_or_repair_duplicate_sources,
+)
 from skillset.paths import load_skillset
 
 
@@ -102,3 +106,111 @@ def test_repair_removes_missing_editable_source(tmp_path, capsys):
     assert changed is True
     assert list(load_skillset(config_path)["skills"]) == ["valid"]
     assert "Removed missing: source not found" in capsys.readouterr().out
+
+
+def test_repair_records_cache_candidate_only_after_safe_consolidation(home_dir, tmp_path):
+    checkout = _git_repo(tmp_path / "checkout", "git@github.com:owner/repo.git")
+    (home_dir / ".cache" / "skillset" / "repos" / "owner" / "repo").mkdir(parents=True)
+    config_path = tmp_path / "skillset.yaml"
+    config = {
+        "skills": {
+            "owner/repo": {"enabled": ["one"]},
+            "local": {"editable": True, "source": str(checkout), "enabled": ["one"]},
+        }
+    }
+    candidates = []
+
+    report_or_repair_duplicate_sources(
+        config, config_path, repair=True, purge_candidates=candidates
+    )
+
+    assert candidates == [("owner/repo", checkout)]
+
+
+def test_repair_finds_cache_for_editable_only_entry(home_dir, tmp_path):
+    checkout = _git_repo(tmp_path / "checkout", "git@github.com:owner/repo.git")
+    (home_dir / ".cache" / "skillset" / "repos" / "owner" / "repo").mkdir(parents=True)
+    config_path = tmp_path / "skillset.yaml"
+    config = {
+        "skills": {
+            "owner/repo": {
+                "editable": True,
+                "source": str(checkout),
+                "enabled": ["one"],
+            }
+        }
+    }
+    candidates = []
+
+    changed = report_or_repair_duplicate_sources(
+        config, config_path, repair=True, purge_candidates=candidates
+    )
+
+    assert changed is False
+    assert candidates == [("owner/repo", checkout)]
+
+
+def test_repair_deduplicates_cache_candidates_for_editable_aliases(home_dir, tmp_path):
+    checkout = _git_repo(tmp_path / "checkout", "git@github.com:owner/repo.git")
+    (home_dir / ".cache" / "skillset" / "repos" / "owner" / "repo").mkdir(parents=True)
+    config_path = tmp_path / "skillset.yaml"
+    config = {
+        "skills": {
+            "first": {"editable": True, "source": str(checkout), "enabled": ["one"]},
+            "second": {"editable": True, "source": str(checkout), "enabled": ["two"]},
+        }
+    }
+    candidates = []
+
+    report_or_repair_duplicate_sources(
+        config, config_path, repair=True, purge_candidates=candidates
+    )
+
+    assert candidates == [("owner/repo", checkout)]
+
+
+def test_removes_redundant_cache_when_confirmed(home_dir, tmp_path, capsys):
+    cache = home_dir / ".cache" / "skillset" / "repos" / "owner" / "repo"
+    cache.mkdir(parents=True)
+    (cache / "file").write_text("cached")
+
+    with patch("builtins.input", return_value=""):
+        remove_redundant_cached_repos([("owner/repo", tmp_path / "checkout")])
+
+    assert not cache.exists()
+    assert not cache.parent.exists()
+    assert "Removed cached clone" in capsys.readouterr().out
+
+
+def test_keeps_redundant_cache_when_declined(home_dir, tmp_path, capsys):
+    cache = home_dir / ".cache" / "skillset" / "repos" / "owner" / "repo"
+    cache.mkdir(parents=True)
+
+    with patch("builtins.input", return_value="n"):
+        remove_redundant_cached_repos([("owner/repo", tmp_path / "checkout")])
+
+    assert cache.exists()
+    assert "Kept cached clone" in capsys.readouterr().out
+
+
+def test_yes_removes_without_prompt(home_dir, tmp_path):
+    cache = home_dir / ".cache" / "skillset" / "repos" / "owner" / "repo"
+    cache.mkdir(parents=True)
+
+    with patch("builtins.input") as prompt:
+        remove_redundant_cached_repos([("owner/repo", tmp_path / "checkout")], answer="yes")
+
+    prompt.assert_not_called()
+    assert not cache.exists()
+
+
+def test_no_reports_cache_without_prompt(home_dir, tmp_path, capsys):
+    cache = home_dir / ".cache" / "skillset" / "repos" / "owner" / "repo"
+    cache.mkdir(parents=True)
+
+    with patch("builtins.input") as prompt:
+        remove_redundant_cached_repos([("owner/repo", tmp_path / "checkout")], answer="no")
+
+    prompt.assert_not_called()
+    assert cache.exists()
+    assert "Redundant cached clone remains" in capsys.readouterr().out
