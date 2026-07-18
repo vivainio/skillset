@@ -81,6 +81,21 @@ def test_init_global():
         mock.assert_called_once_with(g=True)
 
 
+def test_install_skills_invokes_global_handler_without_options():
+    with patch("skillset.cli.cmd_install_skills") as mock:
+        result = runner.invoke(app, ["install-skills"])
+
+        assert result.exit_code == 0
+        mock.assert_called_once_with()
+
+
+def test_install_skills_rejects_global_option():
+    result = runner.invoke(app, ["install-skills", "--global"])
+
+    assert result.exit_code != 0
+    assert "No such option" in result.output
+
+
 def test_clean_invokes_cmd_clean():
     with patch("skillset.cli.cmd_clean") as mock:
         runner.invoke(app, ["clean"])

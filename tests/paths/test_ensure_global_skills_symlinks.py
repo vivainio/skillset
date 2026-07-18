@@ -42,3 +42,44 @@ def test_preserves_existing_skills_paths(home_dir):
 
     assert agents_skills not in created
     assert marker.read_text() == "mine"
+
+
+def test_replaces_empty_existing_skills_directory(home_dir):
+    codex_skills = home_dir / ".codex" / "skills"
+    codex_skills.mkdir(parents=True)
+
+    created = ensure_global_skills_symlinks()
+
+    assert codex_skills in created
+    assert codex_skills.is_symlink()
+    assert codex_skills.resolve() == get_global_skills_dir().resolve()
+
+
+def test_moves_codex_system_skills_before_linking(home_dir):
+    codex_skills = home_dir / ".codex" / "skills"
+    system_skills = codex_skills / ".system"
+    system_skills.mkdir(parents=True)
+    marker = system_skills / ".codex-system-skills.marker"
+    marker.write_text("")
+
+    created = ensure_global_skills_symlinks()
+
+    target = get_global_skills_dir()
+    assert codex_skills in created
+    assert codex_skills.is_symlink()
+    assert (target / ".system" / marker.name).is_file()
+
+
+def test_preserves_codex_system_skills_when_destination_exists(home_dir):
+    codex_system = home_dir / ".codex" / "skills" / ".system"
+    codex_system.mkdir(parents=True)
+    (codex_system / "source").write_text("codex")
+    target_system = get_global_skills_dir() / ".system"
+    target_system.mkdir(parents=True)
+    (target_system / "source").write_text("claude")
+
+    created = ensure_global_skills_symlinks()
+
+    assert created == []
+    assert (codex_system / "source").read_text() == "codex"
+    assert (target_system / "source").read_text() == "claude"

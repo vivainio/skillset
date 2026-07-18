@@ -13,6 +13,18 @@ def test_install_skills_copies_bundled_skill(env, capsys):
     assert "Installed skillset skill" in output
 
 
+def test_install_skills_is_global_inside_configured_project(env, capsys, monkeypatch):
+    (env.project / "skillset.yaml").write_text("skills: {}\n")
+    monkeypatch.chdir(env.project)
+
+    cmd_install_skills()
+
+    global_skill = env.home / ".claude" / "skills" / "skillset" / "SKILL.md"
+    project_skill = env.project / ".claude" / "skills" / "skillset"
+    assert global_skill.is_file()
+    assert not project_skill.exists()
+
+
 def test_install_skills_is_idempotent(env, capsys):
     cmd_install_skills()
     capsys.readouterr()

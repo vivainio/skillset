@@ -136,13 +136,9 @@ def add(
 
 
 @app.command("install-skills")
-def install_skills(
-    global_: Annotated[
-        bool, typer.Option("-g", "--global", help="Install globally even if skillset.yaml is found")
-    ] = False,
-) -> None:
-    """Install skillset's own usage-guide skill (teaches Claude Code the skillset CLI)."""
-    cmd_install_skills(g=global_)
+def install_skills() -> None:
+    """Install skillset's own global usage-guide skill."""
+    cmd_install_skills()
 
 
 @app.command()

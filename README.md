@@ -32,7 +32,8 @@ skillset install-skills       # teach Claude Code the skillset CLI itself
 
 Installs a bundled `SKILL.md` (ships with the package, no network access) that
 documents the `skillset` CLI's own commands, so Claude Code can use `skillset`
-correctly without needing this README pasted into context.
+correctly without needing this README pasted into context. This command always
+installs globally and also links supported agents' global skill directories.
 
 ### Add skills from GitHub
 

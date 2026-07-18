@@ -35,7 +35,9 @@ def ensure_global_skills_symlinks() -> list[Path]:
     """Link other agents' global skill directories to Claude's.
 
     Links are created only for agent directories that already exist. Existing
-    skills paths, including broken symlinks, are never overwritten.
+    non-empty skills paths and symlinks, including broken symlinks, are never
+    overwritten. Codex's .system directory is moved under Claude's skills
+    directory, then empty skills directories are replaced with links.
     """
     home = Path.home()
     candidates = [home / name for name in (".agents", ".codex", ".copilot")]
@@ -44,9 +46,25 @@ def ensure_global_skills_symlinks() -> list[Path]:
     created = []
     for parent in parents:
         link_path = parent / "skills"
-        if link_path.is_symlink() or link_path.exists():
+        if link_path.is_symlink():
             continue
         try:
+            system_dir = link_path / ".system"
+            target_system_dir = target / ".system"
+            if (
+                parent.name == ".codex"
+                and system_dir.is_dir()
+                and not target_system_dir.is_symlink()
+                and not target_system_dir.exists()
+            ):
+                target.mkdir(parents=True, exist_ok=True)
+                system_dir.rename(target_system_dir)
+            if link_path.is_dir():
+                if any(link_path.iterdir()):
+                    continue
+                link_path.rmdir()
+            elif link_path.exists():
+                continue
             if IS_WINDOWS:
                 subprocess.run(
                     ["cmd", "/c", "mklink", "/J", str(link_path), str(target)],

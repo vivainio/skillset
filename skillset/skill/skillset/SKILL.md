@@ -7,7 +7,7 @@ description: Manage AI skills and commands across projects with the skillset CLI
 
 Manages Claude Code (and Copilot) skills and slash commands, symlinked or copied from GitHub repos or local directories. See https://github.com/vivainio/skillset for source.
 
-**Scope:** commands auto-detect scope -- if a `skillset.yaml` is found in the current directory or a parent, skills install to the project (`.claude/skills/`); otherwise they install globally (`~/.claude/skills/`). Pass `-g`/`--global` to force global scope.
+**Scope:** skill-management commands auto-detect scope -- if a `skillset.yaml` is found in the current directory or a parent, skills install to the project (`.claude/skills/`); otherwise they install globally (`~/.claude/skills/`). Pass `-g`/`--global` to force global scope. `install-skills` always installs globally.
 
 **Start here:** `skillset search <term>` to find a skill across everything already cached, `skillset add owner/repo` to install skills from a repo.
 
