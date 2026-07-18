@@ -4,8 +4,14 @@ import fnmatch
 from pathlib import Path
 
 from skillset.discovery import find_skills, parse_skill_metadata
-from skillset.linking import has_glob, is_link, normalize_glob
-from skillset.paths import get_global_skillset_path, get_repo_roots, load_skillset
+from skillset.linking import has_glob, is_link, is_managed, normalize_glob
+from skillset.paths import (
+    get_global_skills_dir,
+    get_global_skillset_path,
+    get_profile_store_dir,
+    get_repo_roots,
+    load_skillset,
+)
 
 
 def _editable_sources() -> list[tuple[str, Path]]:
@@ -49,6 +55,27 @@ def _cached_repos() -> list[tuple[str, Path]]:
     return sources
 
 
+def _unmanaged_skills() -> list[tuple[str, Path]]:
+    """Return installed and profile-stored unmanaged skills."""
+    sources = []
+    seen = set()
+    skills_dir = get_global_skills_dir()
+    if skills_dir.is_dir():
+        for path in sorted(skills_dir.iterdir()):
+            if is_managed(path) or not (path / "SKILL.md").is_file():
+                continue
+            seen.add(str(path.resolve()))
+            sources.append(("Unmanaged", path))
+
+    store = get_profile_store_dir()
+    if store.is_dir():
+        for path in sorted(store.iterdir()):
+            if not (path / "SKILL.md").is_file() or str(path.resolve()) in seen:
+                continue
+            sources.append(("Saved unmanaged", path))
+    return sources
+
+
 def _term_matches(term: str, name: str, haystack: str) -> bool:
     """A single search term matches by substring, or by glob if it has wildcards.
 
@@ -74,7 +101,7 @@ def cmd_search(query: list[str]) -> None:
     seen: set[str] = set()
     results: dict[str, list[tuple[str, str]]] = {}
 
-    for key, source_dir in _editable_sources() + _cached_repos():
+    for key, source_dir in _unmanaged_skills() + _editable_sources() + _cached_repos():
         resolved = str(source_dir)
         if resolved in seen:
             continue

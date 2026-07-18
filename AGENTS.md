@@ -32,9 +32,7 @@ tests/                 Mirrors skillset/ structure per module
 
 ## Testing
 
-Use the `/unit-test` skill when writing tests -- it explains test structure,
-conventions, and fixtures. Integration tests, ruff, and line-length checks
-are special cases not covered by `/unit-test`.
+Follow the existing test structure, conventions, and fixtures under `tests/`.
 
 ## Running checks
 

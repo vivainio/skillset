@@ -41,19 +41,30 @@ def register_local_lib(repo_dir: Path) -> None:
     create_dir_link(link_path, repo_dir)
 
 
-def find_skill(skill_name: str) -> list[tuple[Path, str, str | None, bool]]:
+def find_skill(skill_name: str) -> list[tuple[Path, str | None, str | None, bool]]:
     """Search all sources for a skill by name.
 
-    Searches editable sources in global skillset.yaml and cached repos.
+    Searches profile-stored unmanaged skills, editable sources, and cached repos.
     Returns list of (source_dir, toml_key, toml_source, is_editable) tuples.
     """
-    matches: list[tuple[Path, str, str | None, bool]] = []
+    matches: list[tuple[Path, str | None, str | None, bool]] = []
     seen_dirs: set[str] = set()
 
+    _search_profile_store(skill_name, matches, seen_dirs)
     _search_editable_sources(skill_name, matches, seen_dirs)
     _search_cached_repos(skill_name, matches, seen_dirs)
 
     return matches
+
+
+def _search_profile_store(skill_name, matches, seen_dirs):
+    """Search adopted unmanaged skills saved for profiles."""
+    store = get_profile_store_dir()
+    skill_dir = store / skill_name
+    if not (skill_dir / "SKILL.md").is_file():
+        return
+    seen_dirs.add(str(store.resolve()))
+    matches.append((store, None, str(store), False))
 
 
 def _search_editable_sources(skill_name, matches, seen_dirs):

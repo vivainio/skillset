@@ -9,7 +9,7 @@ Manages Claude Code (and Copilot) skills and slash commands, symlinked or copied
 
 **Scope:** skill-management commands auto-detect scope -- if a `skillset.yaml` is found in the current directory or a parent, skills install to the project (`.claude/skills/`); otherwise they install globally (`~/.claude/skills/`). Pass `-g`/`--global` to force global scope. `install-skills` always installs globally.
 
-**Start here:** `skillset search <term>` to find a skill across everything already cached, `skillset add owner/repo` to install skills from a repo.
+**Start here:** `skillset search <term>` to find a skill across cached, editable, and unmanaged sources, `skillset add owner/repo` to install skills from a repo.
 
 ## Commands
 
@@ -34,7 +34,7 @@ skillset add vivainio/agent-skills -s zaira --snapshot  # freeze the skill at cu
 skillset add vivainio/agent-skills -s zaira --unsnapshot  # convert a snapshot back to a live link
 skillset add owner/repo --fetch                         # clone/cache only, register with no skills enabled -- link nothing yet
 
-# Search skills across every cached repo and editable source (local, offline)
+# Search cached, editable, installed unmanaged, and saved unmanaged skills (local, offline)
 skillset search jira                    # name/description contains "jira"
 skillset search jenkins build           # all terms must match (AND)
 skillset search jira-%                  # glob: name starting with "jira-"

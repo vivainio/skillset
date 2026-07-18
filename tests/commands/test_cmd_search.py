@@ -119,3 +119,31 @@ def test_search_editable_source(env, capsys, tmp_path):
     output = capsys.readouterr().out
     assert "my/editable" in output
     assert "zaira" in output
+
+
+def test_search_installed_unmanaged_skill(env, capsys):
+    skill_dir = env.home / ".claude" / "skills" / "personal"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "SKILL.md").write_text(
+        "---\nname: personal\ndescription: Personal Jira workflow\n---\n"
+    )
+
+    cmd_search(query=["jira"])
+
+    output = capsys.readouterr().out
+    assert "Unmanaged:" in output
+    assert "personal" in output
+
+
+def test_search_saved_unmanaged_skill(env, capsys):
+    skill_dir = env.home / ".claude" / ".skillset" / "skills" / "personal"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "SKILL.md").write_text(
+        "---\nname: personal\ndescription: Personal Jira workflow\n---\n"
+    )
+
+    cmd_search(query=["jira"])
+
+    output = capsys.readouterr().out
+    assert "Saved unmanaged:" in output
+    assert "personal" in output

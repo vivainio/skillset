@@ -137,7 +137,7 @@ unlinks every skill/command sourced from it, drops its `skillset.yaml` entry
 ### Search cached skills
 
 ```bash
-skillset search jira            # skills whose name/description mentions "jira"
+skillset search jira            # cached, editable, and unmanaged skills matching "jira"
 skillset search jenkins build   # all terms must match (AND)
 skillset search jira-%          # glob: name starting with "jira-"
 skillset search %config%        # glob: "config" anywhere in name or description

@@ -125,7 +125,7 @@ def cmd_add(
     linked_commands = _link_commands_for_add(source_dir, commands_dir, interactive, use_copy)
     _print_linked("command", linked_commands, use_copy, commands_dir)
 
-    if linked_skills or linked_commands:
+    if toml_key and (linked_skills or linked_commands):
         _record_install(repo_dir, subpath, use_copy, is_local, trial, skills)
 
     if toml_key and (linked_skills or linked_commands) and not trial:
