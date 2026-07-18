@@ -34,7 +34,7 @@ def test_lists_skill_description_size(env, source_repo, capsys):
     cmd_list()
 
     output = capsys.readouterr().out
-    assert f"skill-a ({len(description)} chars)" in output
+    assert f"skill-a  ({len(description)} chars)" in output
 
 
 def test_lists_zero_size_for_skill_without_description(env, source_repo, capsys):
@@ -45,7 +45,20 @@ def test_lists_zero_size_for_skill_without_description(env, source_repo, capsys)
     cmd_list()
 
     output = capsys.readouterr().out
-    assert "skill-a (0 chars)" in output
+    assert "skill-a  (0 chars)" in output
+
+
+def test_aligns_skill_description_sizes(env, source_repo, capsys):
+    skills_dir = env.home / ".claude" / "skills"
+    skills_dir.mkdir(parents=True)
+    (skills_dir / "a").symlink_to(source_repo / "skill-a")
+    (skills_dir / "long-name").symlink_to(source_repo / "skill-b")
+
+    cmd_list()
+
+    lines = capsys.readouterr().out.splitlines()
+    skill_lines = [line for line in lines if "(0 chars)" in line]
+    assert [line.index("(") for line in skill_lines] == [len("    long-name  ")] * 2
 
 
 def test_lists_symlinked_skills(env, source_repo, capsys):

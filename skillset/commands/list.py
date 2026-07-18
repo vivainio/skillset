@@ -48,22 +48,25 @@ def _print_grouped(
     if not items:
         return
     print(f"{label} ({abbrev(install_dir)}):")
-    groups: dict[str, list[str]] = {}
+    groups: dict[str, list[tuple[str, str]]] = {}
     broken: list[Path] = []
     for item in items:
         target_dir = _resolve_target_dir(item, is_link_fn, broken)
         if target_dir is None:
             continue
         trial_tag = " (trial)" if _is_trial_skill(item, trial_repos) else ""
-        size_tag = ""
         if show_description_size:
             _, description = parse_skill_metadata(item)
-            size_tag = f" ({len(description)} chars)"
-        groups.setdefault(target_dir, []).append(item.name + size_tag + trial_tag)
-    for target_dir, names in sorted(groups.items()):
+            suffix = f"({len(description)} chars){trial_tag}"
+        else:
+            suffix = trial_tag
+        groups.setdefault(target_dir, []).append((item.name, suffix))
+    for target_dir, entries in sorted(groups.items()):
         print(f"  {target_dir}:")
-        for name in sorted(names):
-            print(f"    {name}")
+        name_width = max(len(name) for name, _ in entries)
+        for name, suffix in sorted(entries):
+            spacing = "  " if suffix else ""
+            print(f"    {name:<{name_width}}{spacing}{suffix}")
     for item in broken:
         if prune:
             remove_link(item)
