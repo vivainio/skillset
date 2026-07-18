@@ -3,6 +3,8 @@
 import os
 from pathlib import Path
 
+from skillset.commands.search import _cached_repos, _editable_sources
+from skillset.discovery import find_skills, parse_skill_metadata
 from skillset.linking import (
     get_copy_source,
     is_link,
@@ -123,14 +125,50 @@ def _print_repos(cache_dir: Path, repos: list[str]) -> None:
             print(f"  {repo}")
 
 
-def cmd_list(*, prune: bool = False) -> None:
+def _print_available(installed: set[str]) -> None:
+    """Print skills from cached repos / editable sources that aren't installed."""
+    results: dict[str, list[tuple[str, str]]] = {}
+    seen: set[str] = set()
+    for key, source_dir in _editable_sources() + _cached_repos():
+        resolved = str(source_dir)
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        for skill_dir in find_skills(source_dir):
+            if skill_dir.name in installed:
+                continue
+            _, description = parse_skill_metadata(skill_dir)
+            results.setdefault(key, []).append((skill_dir.name, description))
+
+    if not results:
+        print("No available skills found -- everything cached is already installed")
+        return
+
+    total = 0
+    for key in sorted(results):
+        print(f"{key}:")
+        for name, description in sorted(results[key]):
+            total += 1
+            snippet = description[:100] + ("..." if len(description) > 100 else "")
+            print(f"  {name} -- {snippet}" if snippet else f"  {name}")
+
+    print(f"\n{total} skill(s) available. Install with: skillset add <repo> -s <skill>")
+
+
+def cmd_list(*, prune: bool = False, available: bool = False) -> None:
     """List installed skills and commands."""
     global_skills_dir = get_global_skills_dir()
-    global_commands_dir = get_global_commands_dir()
     project_skills_dir, project_commands_dir = _resolve_project_dirs()
 
     global_skills = _dir_contents(global_skills_dir)
     project_skills = _dir_contents(project_skills_dir)
+
+    if available:
+        installed = {p.name for p in global_skills} | {p.name for p in project_skills}
+        _print_available(installed)
+        return
+
+    global_commands_dir = get_global_commands_dir()
     global_commands = _dir_contents(global_commands_dir)
     project_commands = _dir_contents(project_commands_dir)
 

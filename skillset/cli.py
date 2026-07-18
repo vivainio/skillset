@@ -43,9 +43,13 @@ def _main(
 @app.command("list")
 def list_cmd(
     prune: Annotated[bool, typer.Option(help="Remove broken links")] = False,
+    available: Annotated[
+        bool,
+        typer.Option(help="List skills in cached repos/editable sources that aren't installed"),
+    ] = False,
 ) -> None:
     """List installed skills and commands."""
-    cmd_list(prune=prune)
+    cmd_list(prune=prune, available=available)
 
 
 @app.command()
@@ -205,9 +209,7 @@ def clean(
 def remove(
     name: Annotated[
         str | None,
-        typer.Argument(
-            help="Skill name or glob (e.g. bs-%), or owner/repo to remove a whole repo"
-        ),
+        typer.Argument(help="Skill name or glob (e.g. bs-%), or owner/repo to remove a whole repo"),
     ] = None,
     global_: Annotated[
         bool,

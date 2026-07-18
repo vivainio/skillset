@@ -12,13 +12,19 @@ runner = CliRunner()
 def test_list_invokes_cmd_list():
     with patch("skillset.cli.cmd_list") as mock:
         runner.invoke(app, ["list"])
-        mock.assert_called_once_with(prune=False)
+        mock.assert_called_once_with(prune=False, available=False)
 
 
 def test_list_prune():
     with patch("skillset.cli.cmd_list") as mock:
         runner.invoke(app, ["list", "--prune"])
-        mock.assert_called_once_with(prune=True)
+        mock.assert_called_once_with(prune=True, available=False)
+
+
+def test_list_available():
+    with patch("skillset.cli.cmd_list") as mock:
+        runner.invoke(app, ["list", "--available"])
+        mock.assert_called_once_with(prune=False, available=True)
 
 
 def test_add_invokes_cmd_add():

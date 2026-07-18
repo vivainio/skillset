@@ -131,6 +131,56 @@ def test_project_commands_listed(env, source_repo, capsys):
     assert "Project commands" in output
 
 
+def test_available_no_sources(env, capsys):
+    cmd_list(available=True)
+    output = capsys.readouterr().out
+    assert "No available skills found" in output
+
+
+def test_available_lists_uninstalled_skills(env, source_repo, capsys):
+    cache_dir = env.home / ".cache" / "skillset" / "repos" / "owner"
+    cache_dir.mkdir(parents=True)
+    (cache_dir / "repo").symlink_to(source_repo)
+
+    cmd_list(available=True)
+    output = capsys.readouterr().out
+    assert "owner/repo" in output
+    assert "skill-a" in output
+    assert "skill-b" in output
+    assert "2 skill(s) available" in output
+
+
+def test_available_excludes_installed_skills(env, source_repo, capsys):
+    cache_dir = env.home / ".cache" / "skillset" / "repos" / "owner"
+    cache_dir.mkdir(parents=True)
+    (cache_dir / "repo").symlink_to(source_repo)
+
+    skills_dir = env.home / ".claude" / "skills"
+    skills_dir.mkdir(parents=True)
+    (skills_dir / "skill-a").symlink_to(source_repo / "skill-a")
+
+    cmd_list(available=True)
+    output = capsys.readouterr().out
+    assert "skill-a" not in output
+    assert "skill-b" in output
+    assert "1 skill(s) available" in output
+
+
+def test_available_excludes_project_installed_skills(env, source_repo, capsys):
+    cache_dir = env.home / ".cache" / "skillset" / "repos" / "owner"
+    cache_dir.mkdir(parents=True)
+    (cache_dir / "repo").symlink_to(source_repo)
+
+    project_skills = env.project / ".claude" / "skills"
+    project_skills.mkdir(parents=True)
+    (project_skills / "skill-a").symlink_to(source_repo / "skill-a")
+    (project_skills / "skill-b").symlink_to(source_repo / "skill-b")
+
+    cmd_list(available=True)
+    output = capsys.readouterr().out
+    assert "No available skills found" in output
+
+
 def test_list_fallback_skillset_root(env, source_repo, capsys, monkeypatch):
     """When not in a git repo but skillset.toml is found, use skillset root for project dirs."""
     monkeypatch.setattr("skillset.paths.get_git_root", lambda: None)
