@@ -58,6 +58,10 @@ def cmd_add(
     if not _check_ref_conflict(repo, ref, is_local, skillset_root, force):
         return
 
+    resolved = _resolve_source(repo, interactive, skills, subpath, no_cache, ref)
+    if resolved is None:
+        return
+
     (
         repo,
         toml_key,
@@ -69,9 +73,7 @@ def cmd_add(
         skills,
         subpath,
         ref,
-    ) = _resolve_source(repo, interactive, skills, subpath, no_cache, ref)
-    if repo is None:
-        return
+    ) = resolved
 
     toml_key, toml_source = _reuse_registered_editable(
         repo_dir,

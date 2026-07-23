@@ -2,6 +2,7 @@
 
 import sys
 from pathlib import Path
+from typing import NamedTuple
 
 from skillset.linking import is_link
 from skillset.paths import get_repo_roots
@@ -17,6 +18,21 @@ from skillset.ui import (
     fzf_select,
     is_local_path,
 )
+
+
+class ResolvedSource(NamedTuple):
+    """Source location and persistence metadata resolved for an add operation."""
+
+    repo: str
+    toml_key: str | None
+    toml_source: str | None
+    is_editable: bool
+    repo_dir: Path
+    temp_dir: Path | None
+    source_label: str | None
+    skills: list[str] | None
+    subpath: str | None
+    ref: str | None
 
 
 def derive_toml_key_and_ref(repo: str, ref: str | None) -> tuple[str | None, str | None]:
@@ -44,8 +60,15 @@ def derive_toml_key_and_ref(repo: str, ref: str | None) -> tuple[str | None, str
     return None, None
 
 
-def _resolve_source(repo, interactive, skills, subpath, no_cache, ref=None):
-    """Resolve the source repo/dir and metadata. Returns a 10-tuple."""
+def _resolve_source(
+    repo: str | None,
+    interactive: bool,
+    skills: list[str] | None,
+    subpath: str | None,
+    no_cache: bool,
+    ref: str | None = None,
+) -> ResolvedSource | None:
+    """Resolve the source repo/dir and metadata."""
     temp_dir = None
     source_label = None
     toml_key = None
@@ -59,7 +82,7 @@ def _resolve_source(repo, interactive, skills, subpath, no_cache, ref=None):
             sys.exit(1)
         repo = _pick_repo_interactively()
         if not repo:
-            return None, None, None, False, None, None, None, None, None, None
+            return None
 
     if "://" in repo:
         repo_dir, toml_key, subpath, temp_dir, source_label, resolved_ref = _resolve_url(
@@ -75,7 +98,7 @@ def _resolve_source(repo, interactive, skills, subpath, no_cache, ref=None):
         is_editable, repo_dir, toml_key, toml_source, skills = _resolve_skill_name(repo, skills)
         resolved_ref = None
 
-    return (
+    return ResolvedSource(
         repo,
         toml_key,
         toml_source,
@@ -107,7 +130,7 @@ def _pick_repo_interactively() -> str | None:
     return selected[0] if selected else None
 
 
-def _resolve_local(repo):
+def _resolve_local(repo: str) -> tuple[Path, str, str]:
     """Resolve a local directory path. Returns (repo_dir, toml_key, toml_source)."""
     repo_dir = Path(repo).expanduser().resolve()
     if not repo_dir.is_dir():
@@ -119,7 +142,9 @@ def _resolve_local(repo):
     return repo_dir, toml_key, toml_source
 
 
-def _resolve_skill_name(repo, skills):
+def _resolve_skill_name(
+    repo: str, skills: list[str] | None
+) -> tuple[bool, Path, str | None, str | None, list[str]]:
     """Resolve a bare skill name by searching all sources.
 
     Returns (is_editable, repo_dir, toml_key, toml_source, skills).
@@ -152,7 +177,12 @@ def _resolve_skill_name(repo, skills):
     return is_editable, source_dir, toml_key, toml_source, skills
 
 
-def _resolve_url(repo, subpath, no_cache, ref=None):
+def _resolve_url(
+    repo: str,
+    subpath: str | None,
+    no_cache: bool,
+    ref: str | None = None,
+) -> tuple[Path, str, str | None, Path | None, str | None, str | None]:
     """Resolve a GitHub URL. Returns (repo_dir, toml_key, subpath, temp_dir, source_label, ref)."""
     github_info = parse_github_url(repo)
     if not github_info:
@@ -177,7 +207,9 @@ def _resolve_url(repo, subpath, no_cache, ref=None):
     return repo_dir, toml_key, subpath, temp_dir, source_label, ref
 
 
-def _resolve_spec(repo, no_cache, ref=None):
+def _resolve_spec(
+    repo: str, no_cache: bool, ref: str | None = None
+) -> tuple[Path, str, Path | None, str | None]:
     """Resolve an owner/repo spec. Returns (repo_dir, toml_key, temp_dir, source_label)."""
     try:
         owner, repo_name = parse_repo_spec(repo)
