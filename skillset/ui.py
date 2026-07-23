@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import NamedTuple
 
 from skillset.discovery import find_skills
 from skillset.linking import (
@@ -24,6 +25,15 @@ from skillset.paths import (
 )
 
 
+class SkillMatch(NamedTuple):
+    """A skill source found while searching configured and cached locations."""
+
+    source_dir: Path
+    toml_key: str | None
+    toml_source: str | None
+    is_editable: bool
+
+
 def is_local_path(spec: str) -> bool:
     """Check if spec looks like a local path rather than owner/repo."""
     return spec.startswith(("/", ".", "~")) or Path(spec).expanduser().is_dir()
@@ -41,13 +51,13 @@ def register_local_lib(repo_dir: Path) -> None:
     create_dir_link(link_path, repo_dir)
 
 
-def find_skill(skill_name: str) -> list[tuple[Path, str | None, str | None, bool]]:
+def find_skill(skill_name: str) -> list[SkillMatch]:
     """Search all sources for a skill by name.
 
     Searches profile-stored unmanaged skills, editable sources, and cached repos.
     Returns list of (source_dir, toml_key, toml_source, is_editable) tuples.
     """
-    matches: list[tuple[Path, str | None, str | None, bool]] = []
+    matches: list[SkillMatch] = []
     seen_dirs: set[str] = set()
 
     _search_profile_store(skill_name, matches, seen_dirs)
@@ -57,17 +67,19 @@ def find_skill(skill_name: str) -> list[tuple[Path, str | None, str | None, bool
     return matches
 
 
-def _search_profile_store(skill_name, matches, seen_dirs):
+def _search_profile_store(skill_name: str, matches: list[SkillMatch], seen_dirs: set[str]) -> None:
     """Search adopted unmanaged skills saved for profiles."""
     store = get_profile_store_dir()
     skill_dir = store / skill_name
     if not (skill_dir / "SKILL.md").is_file():
         return
     seen_dirs.add(str(store.resolve()))
-    matches.append((store, None, str(store), False))
+    matches.append(SkillMatch(store, None, str(store), False))
 
 
-def _search_editable_sources(skill_name, matches, seen_dirs):
+def _search_editable_sources(
+    skill_name: str, matches: list[SkillMatch], seen_dirs: set[str]
+) -> None:
     """Search editable entries in global skillset.yaml for a skill."""
     toml_path = get_global_skillset_path()
     if not toml_path.exists():
@@ -87,10 +99,10 @@ def _search_editable_sources(skill_name, matches, seen_dirs):
         if _has_skill(search_dir, skill_name):
             seen_dirs.add(str(search_dir))
             toml_source = str(search_dir).replace("\\", "/")
-            matches.append((search_dir, key, toml_source, True))
+            matches.append(SkillMatch(search_dir, key, toml_source, True))
 
 
-def _search_cached_repos(skill_name, matches, seen_dirs):
+def _search_cached_repos(skill_name: str, matches: list[SkillMatch], seen_dirs: set[str]) -> None:
     """Search cached repos for a skill."""
     seen_keys = set()
     for cache_dir in get_repo_roots():
@@ -108,7 +120,7 @@ def _search_cached_repos(skill_name, matches, seen_dirs):
                 if str(actual_dir) in seen_dirs:
                     continue
                 if _has_skill(actual_dir, skill_name):
-                    matches.append((actual_dir, toml_key, None, False))
+                    matches.append(SkillMatch(actual_dir, toml_key, None, False))
 
 
 def _has_skill(directory: Path, skill_name: str) -> bool:
