@@ -174,7 +174,7 @@ def load_skillset(config_path: Path) -> dict:
     return data or {}
 
 
-def save_skillset(config_path: Path, data) -> None:
+def save_skillset(config_path: Path, data: object) -> None:
     """Write data back to a skillset.yaml file."""
     with config_path.open("w") as f:
         _yaml.dump(data, f)

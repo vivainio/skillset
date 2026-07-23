@@ -15,7 +15,7 @@ from skillset.linking import (
     remove_link,
     remove_managed,
 )
-from skillset.manifest import load_manifest, save_manifest
+from skillset.manifest import InstallOptions, Manifest, load_manifest, save_manifest
 from skillset.paths import (
     SKILLSET_CONFIG_FILE,
     abbrev,
@@ -259,7 +259,7 @@ def _get_managed_source(item: Path) -> str | None:
     return None
 
 
-def _clean_trial_repo(repo_key: str, opts: dict, manifest: dict) -> int:
+def _clean_trial_repo(repo_key: str, opts: InstallOptions, manifest: Manifest) -> int:
     """Clean skills for a single trial repo. Returns count of removed skills."""
     skills_dir = _resolve_clean_skills_dir(opts.get("scope", "global"))
     if skills_dir is None:
@@ -284,7 +284,7 @@ def _clean_trial_repo(repo_key: str, opts: dict, manifest: dict) -> int:
     return removed
 
 
-def _remove_cached_repo(repo_key: str, manifest: dict) -> None:
+def _remove_cached_repo(repo_key: str, manifest: Manifest) -> None:
     """Remove cached repo if no other manifest entries reference it."""
     remaining_keys = set(manifest.keys())
     repo_dir = get_repo_dir(*repo_key.split("/", 1))

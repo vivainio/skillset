@@ -1,16 +1,31 @@
 """Install manifest — tracks per-repo install options."""
 
 import json
+from collections.abc import Mapping
+from pathlib import Path
+from typing import TypedDict
 
 from skillset.paths import get_cache_dir, get_legacy_cache_dir
 
 
-def get_manifest_path():
+class InstallOptions(TypedDict):
+    """Persisted installation settings for one repository."""
+
+    subpath: str | None
+    copy: bool
+    scope: str
+    trial: bool
+
+
+Manifest = dict[str, InstallOptions]
+
+
+def get_manifest_path() -> Path:
     """Get the path to the install manifest."""
     return get_cache_dir() / "manifest.json"
 
 
-def load_manifest() -> dict:
+def load_manifest() -> Manifest:
     """Load the install manifest (tracks per-repo install options)."""
     path = get_manifest_path()
     if path.exists():
@@ -21,7 +36,7 @@ def load_manifest() -> dict:
     return {}
 
 
-def save_manifest(manifest: dict) -> None:
+def save_manifest(manifest: Mapping[str, object]) -> None:
     """Save the install manifest."""
     path = get_manifest_path()
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -42,7 +57,7 @@ def record_install(
     """
     manifest = load_manifest()
     existing = manifest.get(repo_key, {})
-    entry = {
+    entry: InstallOptions = {
         "subpath": subpath,
         "copy": copy,
         "scope": scope,
@@ -52,6 +67,6 @@ def record_install(
     save_manifest(manifest)
 
 
-def get_install_options(repo_key: str) -> dict | None:
+def get_install_options(repo_key: str) -> InstallOptions | None:
     """Get saved install options for a repo."""
     return load_manifest().get(repo_key)
