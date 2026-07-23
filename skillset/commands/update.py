@@ -37,8 +37,13 @@ from skillset.paths import (
 )
 from skillset.repo import clone_or_pull, get_head_sha, get_repo_dir, parse_repo_spec
 
+NewSkills = dict[str, list[str]]
+NewSkillContexts = dict[str, tuple[Path, bool]]
+UpdateSourceResult = tuple[Path | None, Path | None, str | None, str | None, set[str] | None]
+SkillDecisions = tuple[list[str], list[str], int]
 
-def _resolve_toml_path(file, g):
+
+def _resolve_toml_path(file: str | None, g: bool) -> Path:
     """Resolve the skillset.yaml file path."""
     if file:
         return Path(file)
@@ -138,7 +143,7 @@ def cmd_update(
     print(f"\nUpdate complete ({total_linked} skill(s) changed)")
 
 
-def _actionable_notices(output):
+def _actionable_notices(output: str) -> list[str]:
     """Extract messages worth repeating at the end of a long update."""
     markers = (
         "Source not found:",
@@ -154,7 +159,7 @@ def _actionable_notices(output):
     ]
 
 
-def _print_notice_summary(notices):
+def _print_notice_summary(notices: list[str]) -> None:
     if not notices:
         return
     print("\n--- Update notices ---")
@@ -168,7 +173,7 @@ def _print_notice_summary(notices):
         print("Run 'skillset update --repair' to fix repairable configuration entries.")
 
 
-def _apply_links(links_config):
+def _apply_links(links_config: dict[str, str]) -> None:
     """Process the top-level `links:` section: arbitrary symlinks in the project."""
     for local_path, target in links_config.items():
         link = Path(local_path)
@@ -191,7 +196,7 @@ def _apply_links(links_config):
             print(f"  Warning: {local_path} is not in .gitignore")
 
 
-def _update_dirs(is_local, file_path):
+def _update_dirs(is_local: bool, file_path: Path) -> tuple[Path, Path]:
     """Return (skills_dir, commands_dir) for update."""
     if not is_local:
         return get_global_skills_dir(), get_global_commands_dir()
@@ -200,17 +205,17 @@ def _update_dirs(is_local, file_path):
 
 
 def _update_entry(
-    repo_key,
-    value,
-    skills_dir,
-    commands_dir,
-    scope,
-    new_found,
-    new_ctx,
-    file_path,
-    repair,
-    unmanaged_names,
-):
+    repo_key: str,
+    value: object,
+    skills_dir: Path,
+    commands_dir: Path,
+    scope: str,
+    new_found: NewSkills,
+    new_ctx: NewSkillContexts,
+    file_path: Path,
+    repair: bool,
+    unmanaged_names: set[str],
+) -> int:
     """Update a single entry. Returns count of linked skills."""
     if not isinstance(value, dict):
         print(f"\nSkipping {repo_key}: entry must be a sub-table")
@@ -230,17 +235,17 @@ def _update_entry(
 
 
 def _update_dict_entry(
-    repo_key,
-    value,
-    skills_dir,
-    commands_dir,
-    scope,
-    new_found,
-    new_ctx,
-    file_path,
-    repair,
-    unmanaged_names,
-):
+    repo_key: str,
+    value: dict,
+    skills_dir: Path,
+    commands_dir: Path,
+    scope: str,
+    new_found: NewSkills,
+    new_ctx: NewSkillContexts,
+    file_path: Path,
+    repair: bool,
+    unmanaged_names: set[str],
+) -> int:
     """Update a sub-table entry with enabled/disabled lists."""
     if value.get("snapshot"):
         ref_str = value.get("ref")
@@ -332,7 +337,14 @@ def _last_commit_info(repo_dir: Path) -> str | None:
     return result.stdout.strip() or None
 
 
-def _resolve_update_source(repo_key, editable, source_str, path_str, file_path, ref_str=None):
+def _resolve_update_source(
+    repo_key: str,
+    editable: bool,
+    source_str: str | None,
+    path_str: str | None,
+    file_path: Path,
+    ref_str: str | None = None,
+) -> UpdateSourceResult:
     """Resolve source directory for update."""
     owner = repo_name = None
     if editable:
@@ -359,7 +371,7 @@ def _resolve_update_source(repo_key, editable, source_str, path_str, file_path, 
     return source_dir, repo_dir, owner, repo_name, updated
 
 
-def _changed_skill_names(repo_dir, source_dir, old_head):
+def _changed_skill_names(repo_dir: Path, source_dir: Path, old_head: str | None) -> set[str] | None:
     """Return skills changed by the pull, or None for a newly cloned repo."""
     new_head = get_head_sha(repo_dir)
     if old_head is None or new_head is None:
@@ -384,7 +396,14 @@ def _changed_skill_names(repo_dir, source_dir, old_head):
     }
 
 
-def _resolve_editable_source(repo_key, source_str, path_str, file_path, owner, repo_name):
+def _resolve_editable_source(
+    repo_key: str,
+    source_str: str | None,
+    path_str: str | None,
+    file_path: Path,
+    owner: str | None,
+    repo_name: str | None,
+) -> UpdateSourceResult:
     """Resolve editable source directory for update.
 
     A relative source path is resolved against the skillset.yaml's own
@@ -410,21 +429,21 @@ def _resolve_editable_source(repo_key, source_str, path_str, file_path, owner, r
 
 
 def _update_lists(
-    enabled_declared,
-    disabled_set,
-    available_names,
-    tracked,
-    source_dir,
-    skills_dir,
-    commands_dir,
-    use_copy,
-    repo_key,
-    new_found,
-    new_ctx,
-    updated,
-    repair_file,
-    unmanaged_names,
-):
+    enabled_declared: set[str],
+    disabled_set: set[str],
+    available_names: set[str],
+    tracked: set[str],
+    source_dir: Path,
+    skills_dir: Path,
+    commands_dir: Path,
+    use_copy: bool,
+    repo_key: str,
+    new_found: NewSkills,
+    new_ctx: NewSkillContexts,
+    updated: set[str] | None,
+    repair_file: Path | None,
+    unmanaged_names: set[str],
+) -> int:
     """Link enabled (minus missing), unlink disabled, report new untracked skills."""
     new = available_names - tracked
     if new:
@@ -464,7 +483,12 @@ def _update_lists(
     return total
 
 
-def _repair_unmanaged(to_link, skills_dir, repair_file, unmanaged_names):
+def _repair_unmanaged(
+    to_link: set[str],
+    skills_dir: Path,
+    repair_file: Path | None,
+    unmanaged_names: set[str],
+) -> set[str]:
     to_link -= unmanaged_names
     unmanaged = {
         name
@@ -480,13 +504,13 @@ def _repair_unmanaged(to_link, skills_dir, repair_file, unmanaged_names):
     return to_link
 
 
-def _record_unmanaged(file_path, names):
+def _record_unmanaged(file_path: Path, names: set[str]) -> None:
     config = load_skillset(file_path)
     config["unmanaged"] = sorted(set(config.get("unmanaged") or []) | names)
     save_skillset(file_path, config)
 
 
-def _is_managed_from(skill_path, source_dir):
+def _is_managed_from(skill_path: Path, source_dir: Path) -> bool:
     """Return whether a managed skill points into this config entry's source."""
     if not is_managed(skill_path):
         return False
@@ -500,7 +524,13 @@ def _is_managed_from(skill_path, source_dir):
     return True
 
 
-def _collect_new_skill_decisions(names, source_dir, skills_dir, use_copy, mode="ask"):
+def _collect_new_skill_decisions(
+    names: list[str],
+    source_dir: Path,
+    skills_dir: Path,
+    use_copy: bool,
+    mode: str = "ask",
+) -> SkillDecisions:
     """Collect user decisions for new skills. Returns (enabled, disabled, linked_count).
 
     mode: "ask" (prompt the user), "yes" (accept all), "no" (ignore all).
@@ -525,7 +555,9 @@ def _collect_new_skill_decisions(names, source_dir, skills_dir, use_copy, mode="
     return _collect_individual_decisions(names, source_dir, skills_dir, use_copy)
 
 
-def _collect_individual_decisions(names, source_dir, skills_dir, use_copy):
+def _collect_individual_decisions(
+    names: list[str], source_dir: Path, skills_dir: Path, use_copy: bool
+) -> SkillDecisions:
     """Collect individual yes/no decisions for each skill."""
     enabled: list[str] = []
     disabled: list[str] = []
@@ -542,7 +574,13 @@ def _collect_individual_decisions(names, source_dir, skills_dir, use_copy):
     return enabled, disabled, total
 
 
-def _prompt_for_new_skills(new_skills_found, new_skills_ctx, skills_dir, file_path, mode="ask"):
+def _prompt_for_new_skills(
+    new_skills_found: NewSkills,
+    new_skills_ctx: NewSkillContexts,
+    skills_dir: Path,
+    file_path: Path,
+    mode: str = "ask",
+) -> int:
     """Prompt user for new untracked skills. Returns count of linked skills."""
     if not new_skills_found:
         return 0
