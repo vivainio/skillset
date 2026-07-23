@@ -8,6 +8,9 @@ ruff check skillset || fail=1
 echo "=== Ruff format ==="
 ruff format --check skillset || fail=1
 
+echo "=== Type check ==="
+ty check || fail=1
+
 echo "=== Unit + integration tests ==="
 pytest tests -v --cov=skillset --cov-report=term-missing || fail=1
 

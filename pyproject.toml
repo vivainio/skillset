@@ -18,7 +18,7 @@ skillset = ["skill/**/*.md"]
 package = true
 
 [dependency-groups]
-dev = ["pytest>=8.0", "pytest-cov>=6.0", "ruff>=0.8"]
+dev = ["pytest>=8.0", "pytest-cov>=6.0", "ruff>=0.8", "ty>=0.0.60"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -41,3 +41,9 @@ max-complexity = 10
 
 [tool.ruff.format]
 quote-style = "double"
+
+[tool.ty.environment]
+python-version = "3.11"
+
+[tool.ty.src]
+include = ["skillset"]
