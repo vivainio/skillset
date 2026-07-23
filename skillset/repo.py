@@ -4,6 +4,7 @@ import os
 import subprocess
 import tempfile
 from pathlib import Path
+from typing import Literal, overload
 
 from skillset.paths import get_cache_dir, get_legacy_cache_dir
 
@@ -23,9 +24,42 @@ def _git_env() -> dict[str, str]:
     return env
 
 
-def _git(*args: str, **kwargs) -> subprocess.CompletedProcess:
+@overload
+def _git(
+    *args: str,
+    cwd: Path | None = None,
+    check: bool = False,
+    capture_output: bool = False,
+    text: Literal[False] = False,
+) -> subprocess.CompletedProcess[bytes]: ...
+
+
+@overload
+def _git(
+    *args: str,
+    cwd: Path | None = None,
+    check: bool = False,
+    capture_output: bool = False,
+    text: Literal[True],
+) -> subprocess.CompletedProcess[str]: ...
+
+
+def _git(
+    *args: str,
+    cwd: Path | None = None,
+    check: bool = False,
+    capture_output: bool = False,
+    text: bool = False,
+) -> subprocess.CompletedProcess[bytes] | subprocess.CompletedProcess[str]:
     """subprocess.run for git with the no-prompt env baked in."""
-    return subprocess.run(["git", *args], env=_git_env(), **kwargs)
+    return subprocess.run(
+        ["git", *args],
+        env=_git_env(),
+        cwd=cwd,
+        check=check,
+        capture_output=capture_output,
+        text=text,
+    )
 
 
 def parse_repo_spec(spec: str) -> tuple[str, str]:

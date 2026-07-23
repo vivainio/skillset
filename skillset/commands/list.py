@@ -1,6 +1,7 @@
 """Command handler for listing installed skills."""
 
 import os
+from collections.abc import Callable
 from pathlib import Path
 
 from skillset.commands.search import _cached_repos, _editable_sources
@@ -38,7 +39,7 @@ def _is_trial_skill(item: Path, trial_repos: set[str]) -> bool:
 
 def _print_grouped(
     items: list[Path],
-    is_link_fn,
+    is_link_fn: Callable[[Path], bool],
     label: str,
     install_dir: Path,
     trial_repos: set[str],
@@ -76,7 +77,9 @@ def _print_grouped(
             print(f"  [broken link: {item.name}]")
 
 
-def _resolve_target_dir(item: Path, is_link_fn, broken: list[Path]) -> str | None:
+def _resolve_target_dir(
+    item: Path, is_link_fn: Callable[[Path], bool], broken: list[Path]
+) -> str | None:
     """Resolve display target directory for a skill/command item."""
     if not is_link_fn(item):
         return "Unmanaged"
@@ -104,7 +107,7 @@ def _list_repos(cache_dir: Path) -> list[str]:
     return repos
 
 
-def _resolve_project_dirs():
+def _resolve_project_dirs() -> tuple[Path | None, Path | None]:
     """Resolve project skills and commands dirs with skillset.yaml fallback."""
     skills_dir = get_project_skills_dir()
     commands_dir = get_project_commands_dir()
@@ -186,7 +189,13 @@ def cmd_list(*, prune: bool = False, available: bool = False) -> None:
     manifest = load_manifest()
     trial_repos = {k for k, v in manifest.items() if v.get("trial")}
 
-    def pg(items, fn, label, d, show_description_size=False):
+    def pg(
+        items: list[Path],
+        fn: Callable[[Path], bool],
+        label: str,
+        d: Path,
+        show_description_size: bool = False,
+    ) -> None:
         _print_grouped(
             items,
             fn,

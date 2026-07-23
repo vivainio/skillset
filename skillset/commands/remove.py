@@ -129,7 +129,7 @@ def _persist_disabled(config_path: Path, skills_dir: Path, names: list[str]) -> 
             print(f"Disabled {joined} in {abbrev(config_path)}")
 
 
-def _entry_for_source(config, config_path: Path, skill_path: Path) -> str | None:
+def _entry_for_source(config: dict, config_path: Path, skill_path: Path) -> str | None:
     source_text = _get_managed_source(skill_path)
     if not source_text:
         return None

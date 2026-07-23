@@ -38,7 +38,7 @@ def _repo_key_from_remote(remote: str) -> str | None:
     return match.group(1).removesuffix(".git") if match else None
 
 
-def _duplicate_groups(config, file_path):
+def _duplicate_groups(config: dict, file_path: Path) -> dict[str, dict]:
     skills = config.get("skills") or {}
     groups: dict[str, dict] = {}
     for key, value in skills.items():
@@ -61,7 +61,12 @@ def _duplicate_groups(config, file_path):
     }
 
 
-def report_or_repair_duplicate_sources(config, file_path, repair=False, purge_candidates=None):
+def report_or_repair_duplicate_sources(
+    config: dict,
+    file_path: Path,
+    repair: bool = False,
+    purge_candidates: list[tuple[str, Path]] | None = None,
+) -> bool:
     """Report duplicate cached/editable repos; optionally consolidate safe groups."""
     groups = _duplicate_groups(config, file_path)
     missing = _missing_editable_entries(config, file_path) if repair else {}
@@ -91,7 +96,7 @@ def report_or_repair_duplicate_sources(config, file_path, repair=False, purge_ca
     return changed
 
 
-def _redundant_cache_candidates(config, file_path):
+def _redundant_cache_candidates(config: dict, file_path: Path) -> list[tuple[str, Path]]:
     candidates = {}
     for entry in (config.get("skills") or {}).values():
         if not isinstance(entry, dict) or not entry.get("editable") or entry.get("snapshot"):
@@ -113,7 +118,7 @@ def _redundant_cache_candidates(config, file_path):
     return list(candidates.items())
 
 
-def remove_redundant_cached_repos(candidates, answer="ask"):
+def remove_redundant_cached_repos(candidates: list[tuple[str, Path]], answer: str = "ask") -> None:
     """Offer to remove repaired cached clones after editable sources are linked."""
     for repo_key, editable_root in candidates:
         owner, repo = repo_key.split("/", 1)
@@ -138,7 +143,7 @@ def remove_redundant_cached_repos(candidates, answer="ask"):
             print(f"Kept cached clone {abbrev(cache_dir)}")
 
 
-def _remove_cache_dir(cache_dir):
+def _remove_cache_dir(cache_dir: Path) -> None:
     if cache_dir.is_symlink():
         cache_dir.unlink()
     else:
@@ -148,7 +153,7 @@ def _remove_cache_dir(cache_dir):
         parent.rmdir()
 
 
-def _missing_editable_entries(config, file_path):
+def _missing_editable_entries(config: dict, file_path: Path) -> dict[str, Path]:
     missing = {}
     for key, entry in (config.get("skills") or {}).items():
         if not isinstance(entry, dict) or not entry.get("editable") or not entry.get("source"):
@@ -162,7 +167,7 @@ def _missing_editable_entries(config, file_path):
     return missing
 
 
-def _repair_group(config, repo_key, group):
+def _repair_group(config: dict, repo_key: str, group: dict) -> bool:
     skills = config["skills"]
     keys = [repo_key, *group["editable"]]
     entries = [skills[key] for key in keys]
@@ -204,7 +209,7 @@ def _repair_group(config, repo_key, group):
     return True
 
 
-def _entry_source_dir(key, entry, editable_root, repo_key):
+def _entry_source_dir(key: str, entry: dict, editable_root: Path, repo_key: str) -> Path:
     if key == repo_key:
         base = editable_root
     else:
@@ -213,7 +218,7 @@ def _entry_source_dir(key, entry, editable_root, repo_key):
     return base / path if path else base
 
 
-def _expand(patterns, available):
+def _expand(patterns: list[str], available: set[str]) -> set[str]:
     from fnmatch import fnmatchcase
 
     expanded = set()

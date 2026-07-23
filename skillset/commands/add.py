@@ -32,6 +32,8 @@ from skillset.paths import (
 from skillset.repo import get_head_sha
 from skillset.ui import fzf_select, fzf_select_skills, prompt_skill_selection
 
+SkillSelectionResult = tuple[list[str], list[str] | None, list[str] | None]
+
 
 def cmd_add(
     *,
@@ -154,20 +156,20 @@ def cmd_add(
 
 
 def _do_fetch(
-    repo_dir,
-    source_dir,
-    temp_dir,
-    toml_key,
-    toml_source,
-    subpath,
-    is_editable,
-    is_local,
-    skillset_root,
-    ref,
-    snapshot,
-    unsnapshot,
-    trial,
-):
+    repo_dir: Path,
+    source_dir: Path,
+    temp_dir: Path | None,
+    toml_key: str | None,
+    toml_source: str | None,
+    subpath: str | None,
+    is_editable: bool,
+    is_local: bool,
+    skillset_root: Path | None,
+    ref: str | None,
+    snapshot: bool,
+    unsnapshot: bool,
+    trial: bool,
+) -> None:
     """Clone/cache the repo and register it with no skills enabled -- link nothing."""
     print(f"Fetched {abbrev(repo_dir)}")
     if toml_key and not trial:
@@ -191,7 +193,9 @@ def _do_fetch(
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 
-def _apply_snapshot_flags(snapshot, unsnapshot, copy, force, ref):
+def _apply_snapshot_flags(
+    snapshot: bool, unsnapshot: bool, copy: bool, force: bool, ref: str | None
+) -> tuple[bool, bool, str | None]:
     """Resolve --snapshot / --unsnapshot into (copy, force, ref) adjustments.
 
     --snapshot: copy as-is and freeze in yaml; re-snapshotting overrides ref.
@@ -209,14 +213,21 @@ def _apply_snapshot_flags(snapshot, unsnapshot, copy, force, ref):
     return copy, force, ref
 
 
-def _pin_snapshot_ref(snapshot: bool, repo_dir, ref):
+def _pin_snapshot_ref(snapshot: bool, repo_dir: Path, ref: str | None) -> str | None:
     """For snapshot installs, replace ref with the resolved HEAD SHA."""
     if not snapshot or repo_dir is None:
         return ref
     return get_head_sha(repo_dir) or ref
 
 
-def _link_skills_for_add(source_dir, skills_dir, skills, interactive, use_copy, source_label):
+def _link_skills_for_add(
+    source_dir: Path,
+    skills_dir: Path,
+    skills: list[str] | None,
+    interactive: bool,
+    use_copy: bool,
+    source_label: str | None,
+) -> SkillSelectionResult:
     """Select and link skills. Returns (linked_skills, enabled_list, disabled_list).
 
     enabled_list / disabled_list are what gets persisted to skillset.yaml:
@@ -253,7 +264,9 @@ def _link_skills_for_add(source_dir, skills_dir, skills, interactive, use_copy, 
     return _link_prompted_skills(source_dir, skills_dir, use_copy, source_label)
 
 
-def _link_interactive_skills(source_dir, skills_dir, use_copy, source_label):
+def _link_interactive_skills(
+    source_dir: Path, skills_dir: Path, use_copy: bool, source_label: str | None
+) -> SkillSelectionResult:
     """Link skills selected via fzf. Returns (linked, enabled, disabled)."""
     available_skills = find_skills(source_dir)
     if not available_skills:
@@ -275,7 +288,9 @@ def _link_interactive_skills(source_dir, skills_dir, use_copy, source_label):
     return linked, enabled, disabled
 
 
-def _link_prompted_skills(source_dir, skills_dir, use_copy, source_label):
+def _link_prompted_skills(
+    source_dir: Path, skills_dir: Path, use_copy: bool, source_label: str | None
+) -> SkillSelectionResult:
     """Link skills selected via interactive y/N prompt. Returns (linked, enabled, disabled)."""
     available_skills = find_skills(source_dir)
     if not available_skills:
@@ -291,7 +306,9 @@ def _link_prompted_skills(source_dir, skills_dir, use_copy, source_label):
     return linked, enabled, disabled
 
 
-def _link_commands_for_add(source_dir, commands_dir, interactive, use_copy):
+def _link_commands_for_add(
+    source_dir: Path, commands_dir: Path, interactive: bool, use_copy: bool
+) -> list[str]:
     """Select and link commands. Returns linked command names."""
     if interactive:
         available_commands = find_commands(source_dir)
@@ -303,7 +320,7 @@ def _link_commands_for_add(source_dir, commands_dir, interactive, use_copy):
     return link_commands(source_dir, commands_dir, copy=use_copy)
 
 
-def _print_linked(kind, linked, use_copy, target_dir):
+def _print_linked(kind: str, linked: list[str], use_copy: bool, target_dir: Path) -> None:
     """Print linked skills/commands summary."""
     if linked:
         verb = "Copied" if use_copy else "Linked"
@@ -312,7 +329,14 @@ def _print_linked(kind, linked, use_copy, target_dir):
             print(f"  - {name}")
 
 
-def _record_install(repo_dir, subpath, use_copy, is_local, trial, skills):
+def _record_install(
+    repo_dir: Path,
+    subpath: str | None,
+    use_copy: bool,
+    is_local: bool,
+    trial: bool,
+    skills: list[str] | None,
+) -> None:
     """Record install options in manifest."""
     repo_key = str(repo_dir)
     for root in get_repo_roots():
@@ -336,7 +360,7 @@ def _record_install(repo_dir, subpath, use_copy, is_local, trial, skills):
     )
 
 
-def _ensure_toml_exists(is_editable, is_local, skillset_root):
+def _ensure_toml_exists(is_editable: bool, is_local: bool, skillset_root: Path | None) -> None:
     """Create skillset.yaml if missing and we're about to write to it.
 
     Only auto-creates for editable sources -- otherwise `add` should fail loudly
@@ -344,19 +368,32 @@ def _ensure_toml_exists(is_editable, is_local, skillset_root):
     """
     if not is_editable:
         return
-    toml_path = (skillset_root / SKILLSET_CONFIG_FILE) if is_local else get_global_skillset_path()
+    if is_local:
+        assert skillset_root is not None
+        toml_path = skillset_root / SKILLSET_CONFIG_FILE
+    else:
+        toml_path = get_global_skillset_path()
     if not toml_path.exists():
         toml_path.parent.mkdir(parents=True, exist_ok=True)
         toml_path.write_text("skills: {}\n")
 
 
 def _reuse_registered_editable(
-    repo_dir, toml_key, toml_source, is_editable, is_local, skillset_root
-):
+    repo_dir: Path,
+    toml_key: str | None,
+    toml_source: str | None,
+    is_editable: bool,
+    is_local: bool,
+    skillset_root: Path | None,
+) -> tuple[str | None, str | None]:
     """Reuse the most specific registered editable source containing repo_dir."""
     if not is_editable:
         return toml_key, toml_source
-    toml_path = skillset_root / SKILLSET_CONFIG_FILE if is_local else get_global_skillset_path()
+    if is_local:
+        assert skillset_root is not None
+        toml_path = skillset_root / SKILLSET_CONFIG_FILE
+    else:
+        toml_path = get_global_skillset_path()
     if not toml_path.exists():
         return toml_key, toml_source
     matches = []
@@ -379,20 +416,24 @@ def _reuse_registered_editable(
 
 
 def _register_in_toml(
-    toml_key,
-    subpath,
-    enabled,
-    disabled,
-    is_editable,
-    toml_source,
-    is_local,
-    skillset_root,
-    ref=None,
-    snapshot=False,
-    unsnapshot=False,
-):
+    toml_key: str,
+    subpath: str | None,
+    enabled: list[str] | None,
+    disabled: list[str] | None,
+    is_editable: bool,
+    toml_source: str | None,
+    is_local: bool,
+    skillset_root: Path | None,
+    ref: str | None = None,
+    snapshot: bool = False,
+    unsnapshot: bool = False,
+) -> None:
     """Register or update skillset.yaml entry for this repo."""
-    toml_path = (skillset_root / SKILLSET_CONFIG_FILE) if is_local else get_global_skillset_path()
+    if is_local:
+        assert skillset_root is not None
+        toml_path = skillset_root / SKILLSET_CONFIG_FILE
+    else:
+        toml_path = get_global_skillset_path()
 
     written = add_to_skillset(
         toml_path,
@@ -437,7 +478,13 @@ def _register_in_toml(
         print(f"Updated {abbrev(toml_path)}")
 
 
-def _check_ref_conflict(repo, ref, is_local, skillset_root, force) -> bool:
+def _check_ref_conflict(
+    repo: str | None,
+    ref: str | None,
+    is_local: bool,
+    skillset_root: Path | None,
+    force: bool,
+) -> bool:
     """Refuse a ref override on an already-registered repo unless --force.
 
     Returns True to continue, False to abort cmd_add. When --force is set we
@@ -447,7 +494,11 @@ def _check_ref_conflict(repo, ref, is_local, skillset_root, force) -> bool:
     if not toml_key:
         return True
 
-    toml_path = (skillset_root / SKILLSET_CONFIG_FILE) if is_local else get_global_skillset_path()
+    if is_local:
+        assert skillset_root is not None
+        toml_path = skillset_root / SKILLSET_CONFIG_FILE
+    else:
+        toml_path = get_global_skillset_path()
     if not toml_path.exists():
         return True
 
