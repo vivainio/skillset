@@ -9,25 +9,25 @@ from skillset.cli import app
 runner = CliRunner()
 
 
-def test_list_invokes_cmd_list():
+def test_list_invokes_cmd_list() -> None:
     with patch("skillset.cli.cmd_list") as mock:
         runner.invoke(app, ["list"])
         mock.assert_called_once_with(prune=False, available=False)
 
 
-def test_list_prune():
+def test_list_prune() -> None:
     with patch("skillset.cli.cmd_list") as mock:
         runner.invoke(app, ["list", "--prune"])
         mock.assert_called_once_with(prune=True, available=False)
 
 
-def test_list_available():
+def test_list_available() -> None:
     with patch("skillset.cli.cmd_list") as mock:
         runner.invoke(app, ["list", "--available"])
         mock.assert_called_once_with(prune=False, available=True)
 
 
-def test_add_invokes_cmd_add():
+def test_add_invokes_cmd_add() -> None:
     with patch("skillset.cli.cmd_add") as mock:
         runner.invoke(app, ["add", "owner/repo"])
         mock.assert_called_once()
@@ -35,7 +35,7 @@ def test_add_invokes_cmd_add():
         assert kwargs["repo"] == "owner/repo"
 
 
-def test_add_with_options():
+def test_add_with_options() -> None:
     with patch("skillset.cli.cmd_add") as mock:
         runner.invoke(app, ["add", "owner/repo", "--global", "--copy", "-s", "skill-a"])
         kwargs = mock.call_args[1]
@@ -44,62 +44,62 @@ def test_add_with_options():
         assert kwargs["skills"] == ["skill-a"]
 
 
-def test_remove_invokes_cmd_remove():
+def test_remove_invokes_cmd_remove() -> None:
     with patch("skillset.cli.cmd_remove") as mock:
         runner.invoke(app, ["remove", "skill-a"])
         mock.assert_called_once_with(name="skill-a", g=False, interactive=False)
 
 
-def test_profile_invokes_cmd_profile():
+def test_profile_invokes_cmd_profile() -> None:
     with patch("skillset.cli.cmd_profile") as mock:
         runner.invoke(app, ["profile", "work"])
         mock.assert_called_once_with(name="work")
 
 
-def test_profile_without_name_opens_menu():
+def test_profile_without_name_opens_menu() -> None:
     with patch("skillset.cli.cmd_profile") as mock:
         runner.invoke(app, ["profile"])
         mock.assert_called_once_with(name=None)
 
 
-def test_add_interactive_flag():
+def test_add_interactive_flag() -> None:
     with patch("skillset.cli.cmd_add") as mock:
         runner.invoke(app, ["add", "-i"])
         kwargs = mock.call_args[1]
         assert kwargs["interactive"] is True
 
 
-def test_remove_interactive_flag():
+def test_remove_interactive_flag() -> None:
     with patch("skillset.cli.cmd_remove") as mock:
         runner.invoke(app, ["remove", "-i"])
         mock.assert_called_once_with(name=None, g=False, interactive=True)
 
 
-def test_update_invokes_cmd_update():
+def test_update_invokes_cmd_update() -> None:
     with patch("skillset.cli.cmd_update") as mock:
         runner.invoke(app, ["update"])
         mock.assert_called_once_with(file=None, g=False, new="ask", repair=False)
 
 
-def test_update_repair_flag():
+def test_update_repair_flag() -> None:
     with patch("skillset.cli.cmd_update") as mock:
         runner.invoke(app, ["update", "--repair"])
         mock.assert_called_once_with(file=None, g=False, new="ask", repair=True)
 
 
-def test_init_invokes_cmd_init():
+def test_init_invokes_cmd_init() -> None:
     with patch("skillset.cli.cmd_init") as mock:
         runner.invoke(app, ["init"])
         mock.assert_called_once_with(g=False)
 
 
-def test_init_global():
+def test_init_global() -> None:
     with patch("skillset.cli.cmd_init") as mock:
         runner.invoke(app, ["init", "--global"])
         mock.assert_called_once_with(g=True)
 
 
-def test_install_skills_invokes_global_handler_without_options():
+def test_install_skills_invokes_global_handler_without_options() -> None:
     with patch("skillset.cli.cmd_install_skills") as mock:
         result = runner.invoke(app, ["install-skills"])
 
@@ -107,20 +107,20 @@ def test_install_skills_invokes_global_handler_without_options():
         mock.assert_called_once_with()
 
 
-def test_install_skills_rejects_global_option():
+def test_install_skills_rejects_global_option() -> None:
     result = runner.invoke(app, ["install-skills", "--global"])
 
     assert result.exit_code != 0
     assert "No such option" in result.output
 
 
-def test_clean_invokes_cmd_clean():
+def test_clean_invokes_cmd_clean() -> None:
     with patch("skillset.cli.cmd_clean") as mock:
         runner.invoke(app, ["clean"])
         mock.assert_called_once_with(g=False)
 
 
-def test_main_function():
+def test_main_function() -> None:
     with patch("skillset.cli.app") as mock_app:
         from skillset.cli import main
 
@@ -128,7 +128,7 @@ def test_main_function():
         mock_app.assert_called_once()
 
 
-def test_no_args_shows_help():
+def test_no_args_shows_help() -> None:
     result = runner.invoke(app, [])
     # typer with no_args_is_help=True exits with code 0 or 2 depending on version
     assert result.exit_code in (0, 2)

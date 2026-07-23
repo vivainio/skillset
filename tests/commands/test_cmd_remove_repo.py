@@ -1,13 +1,16 @@
 """Tests for skillset.commands.cmd_remove -- whole-repo removal (owner/repo)."""
 
+from pathlib import Path
+
 import pytest
 
 from skillset.commands import cmd_remove
 from skillset.manifest import load_manifest, save_manifest
 from skillset.paths import load_skillset, save_skillset
+from tests.support import Env
 
 
-def _cached_repo(env, owner, name):
+def _cached_repo(env: Env, owner: str, name: str) -> Path:
     repo_dir = env.home / ".cache" / "skillset" / "repos" / owner / name
     skill_dir = repo_dir / "some-skill"
     skill_dir.mkdir(parents=True)
@@ -15,7 +18,7 @@ def _cached_repo(env, owner, name):
     return repo_dir
 
 
-def test_removes_cached_repo_dir(env, capsys):
+def test_removes_cached_repo_dir(env: Env, capsys: pytest.CaptureFixture[str]) -> None:
     repo_dir = _cached_repo(env, "owner", "repo")
 
     cmd_remove(name="owner/repo")
@@ -25,7 +28,9 @@ def test_removes_cached_repo_dir(env, capsys):
     assert "Removed cached repo" in output
 
 
-def test_removes_linked_skill_sourced_from_repo(env, capsys):
+def test_removes_linked_skill_sourced_from_repo(
+    env: Env, capsys: pytest.CaptureFixture[str]
+) -> None:
     repo_dir = _cached_repo(env, "owner", "repo")
     skills_dir = env.home / ".claude" / "skills"
     skills_dir.mkdir(parents=True)
@@ -38,7 +43,7 @@ def test_removes_linked_skill_sourced_from_repo(env, capsys):
     assert "Removed skill some-skill" in output
 
 
-def test_removes_skillset_yaml_entry(env, capsys):
+def test_removes_skillset_yaml_entry(env: Env, capsys: pytest.CaptureFixture[str]) -> None:
     _cached_repo(env, "owner", "repo")
     toml_path = env.home / ".claude" / "skillset.yaml"
     save_skillset(toml_path, {"skills": {"owner/repo": {"enabled": ["*"]}}})
@@ -51,7 +56,7 @@ def test_removes_skillset_yaml_entry(env, capsys):
     assert "Removed owner/repo from" in output
 
 
-def test_removes_manifest_entry(env):
+def test_removes_manifest_entry(env: Env) -> None:
     _cached_repo(env, "owner", "repo")
     manifest = {"owner/repo": {"scope": "global", "trial": False}}
     save_manifest(manifest)
@@ -61,12 +66,14 @@ def test_removes_manifest_entry(env):
     assert "owner/repo" not in load_manifest()
 
 
-def test_exits_when_repo_not_found(env):
+def test_exits_when_repo_not_found(env: Env) -> None:
     with pytest.raises(SystemExit):
         cmd_remove(name="owner/nonexistent")
 
 
-def test_global_flag_removes_from_global_scope(env, capsys):
+def test_global_flag_removes_from_global_scope(
+    env: Env, capsys: pytest.CaptureFixture[str]
+) -> None:
     repo_dir = _cached_repo(env, "owner", "repo")
 
     cmd_remove(name="owner/repo", g=True)

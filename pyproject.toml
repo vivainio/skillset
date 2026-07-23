@@ -46,4 +46,4 @@ quote-style = "double"
 python-version = "3.11"
 
 [tool.ty.src]
-include = ["skillset"]
+include = ["skillset", "tests"]

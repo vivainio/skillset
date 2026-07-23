@@ -1,9 +1,11 @@
 """Tests for skillset.linking.copy_dir."""
 
+from pathlib import Path
+
 from skillset.linking import SKILLSET_SOURCE_MARKER, copy_dir, is_managed_copy
 
 
-def test_copies_with_marker(tmp_path):
+def test_copies_with_marker(tmp_path: Path) -> None:
     src = tmp_path / "src"
     src.mkdir()
     (src / "file.txt").write_text("hello")
@@ -16,7 +18,7 @@ def test_copies_with_marker(tmp_path):
     assert is_managed_copy(dst) is True
 
 
-def test_overwrites_existing(tmp_path):
+def test_overwrites_existing(tmp_path: Path) -> None:
     src = tmp_path / "src"
     src.mkdir()
     (src / "file.txt").write_text("new content")

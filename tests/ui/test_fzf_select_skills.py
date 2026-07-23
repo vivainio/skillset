@@ -1,16 +1,17 @@
 """Tests for skillset.ui.fzf_select_skills."""
 
+from pathlib import Path
 from unittest.mock import patch
 
 from skillset.ui import fzf_select_skills
 
 
-def _mock_fzf(*responses):
+def _mock_fzf(*responses: list[str]) -> list[list[str]]:
     """Return a side_effect for fzf_select that yields responses in order."""
     return list(responses)
 
 
-def test_single_group_flat(tmp_path):
+def test_single_group_flat(tmp_path: Path) -> None:
     """Skills in one group are shown flat, no drill-down."""
     repo = tmp_path / "repo"
     skills_dir = repo / "skills"
@@ -28,7 +29,7 @@ def test_single_group_flat(tmp_path):
     assert mock.call_args[1]["prompt"] == "Skills> "
 
 
-def test_marks_installed_skills(tmp_path):
+def test_marks_installed_skills(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     skills_dir = repo / "skills"
     skills = []
@@ -47,7 +48,7 @@ def test_marks_installed_skills(tmp_path):
     assert "  beta" in items
 
 
-def test_multiple_groups_drill_down(tmp_path):
+def test_multiple_groups_drill_down(tmp_path: Path) -> None:
     """Multiple groups: default shown flat, others as [group] entries."""
     repo = tmp_path / "repo"
     # Create two groups
@@ -66,7 +67,7 @@ def test_multiple_groups_drill_down(tmp_path):
     assert result == ["beta"]
 
 
-def test_mixed_selection_flat_and_group(tmp_path):
+def test_mixed_selection_flat_and_group(tmp_path: Path) -> None:
     """User selects both flat items and drills into a group."""
     repo = tmp_path / "repo"
     for group, names in [("skills", ["alpha"]), ("extra", ["beta", "gamma"])]:
@@ -85,7 +86,7 @@ def test_mixed_selection_flat_and_group(tmp_path):
     assert "beta" not in result
 
 
-def test_empty_skills_returns_empty(tmp_path):
+def test_empty_skills_returns_empty(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
 
     with patch("skillset.ui.fzf_select", return_value=[]):

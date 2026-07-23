@@ -7,13 +7,14 @@ import pytest
 
 from skillset.commands import cmd_add, cmd_update  # noqa: F401
 from skillset.paths import load_skillset, save_skillset
+from tests.support import Env, LocalEnv
 
 FIXTURES = Path(__file__).parent / "fixtures"
 ALL_SKILLS = {"alpha", "beta", "gamma"}
 
 
 @pytest.fixture
-def env(tmp_path, monkeypatch):
+def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Env:
     """Isolated environment with global scope (no local skillset.yaml)."""
     home = tmp_path / "home"
     project = tmp_path / "project"
@@ -33,11 +34,11 @@ def env(tmp_path, monkeypatch):
     (home / ".claude").mkdir(parents=True)
     (home / ".cache" / "skillset" / "repos").mkdir(parents=True)
 
-    return type("Env", (), {"home": home, "project": project, "tmp": tmp_path})()
+    return Env(home=home, project=project, tmp=tmp_path)
 
 
 @pytest.fixture
-def local_env(tmp_path, monkeypatch):
+def local_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> LocalEnv:
     """Isolated environment with a local skillset.yaml (project scope)."""
     home = tmp_path / "home"
     project = tmp_path / "project"
@@ -60,17 +61,13 @@ def local_env(tmp_path, monkeypatch):
     toml_path = project / "skillset.yaml"
     toml_path.write_text("skills: {}\n")
 
-    return type(
-        "Env",
-        (),
-        {
-            "home": home,
-            "project": project,
-            "tmp": tmp_path,
-            "toml_path": toml_path,
-            "skills_dir": project / ".claude" / "skills",
-        },
-    )()
+    return LocalEnv(
+        home=home,
+        project=project,
+        tmp=tmp_path,
+        toml_path=toml_path,
+        skills_dir=project / ".claude" / "skills",
+    )
 
 
 def installed_skills(skills_dir: Path) -> set[str]:

@@ -2,13 +2,22 @@
 
 import shutil
 import textwrap
+from pathlib import Path
+
+import pytest
 
 from skillset.commands import cmd_update
+from tests.support import LocalEnv
 
 from .conftest import FIXTURES, installed_skills
 
 
-def _write_entry(toml_path, source, enabled, disabled=None):
+def _write_entry(
+    toml_path: Path,
+    source: Path,
+    enabled: list[str],
+    disabled: list[str] | None = None,
+) -> None:
     body = textwrap.dedent(f"""\
         skills:
           editable-skills:
@@ -22,7 +31,7 @@ def _write_entry(toml_path, source, enabled, disabled=None):
 
 
 class TestSyncEditableSelective:
-    def test_sync_only_links_enabled(self, local_env):
+    def test_sync_only_links_enabled(self, local_env: LocalEnv) -> None:
         """Write yaml manually with alpha+gamma enabled, beta disabled."""
         _write_entry(
             local_env.toml_path,
@@ -38,7 +47,7 @@ class TestSyncEditableSelective:
         assert "gamma" in installed
         assert "beta" not in installed
 
-    def test_sync_removes_disabled_skill(self, local_env):
+    def test_sync_removes_disabled_skill(self, local_env: LocalEnv) -> None:
         """If beta was previously linked, sync removes it when listed in disabled."""
         local_env.skills_dir.mkdir(parents=True, exist_ok=True)
         (local_env.skills_dir / "beta").symlink_to(FIXTURES / "beta")
@@ -55,8 +64,8 @@ class TestSyncEditableSelective:
         assert not (local_env.skills_dir / "beta").exists()
 
     def test_sync_removes_stale_symlink_when_skill_deleted_from_source(
-        self, local_env, tmp_path, capsys
-    ):
+        self, local_env: LocalEnv, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         """If an enabled skill is removed from the source dir, its symlink is cleaned up."""
         editable_dir = tmp_path / "editable-skills"
         shutil.copytree(FIXTURES, editable_dir)

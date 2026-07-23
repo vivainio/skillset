@@ -1,11 +1,14 @@
 """Tests for the installed-skill removal picker."""
 
+from pathlib import Path
 from unittest.mock import patch
+
+import pytest
 
 from skillset.ui import fzf_select_installed_skills
 
 
-def test_groups_skills_by_source_location(tmp_path):
+def test_groups_skills_by_source_location(tmp_path: Path) -> None:
     source_a = tmp_path / "a"
     source_b = tmp_path / "b"
     (source_a / "alpha").mkdir(parents=True)
@@ -17,7 +20,7 @@ def test_groups_skills_by_source_location(tmp_path):
     skill_z.symlink_to(source_b / "zulu")
     skill_a.symlink_to(source_a / "alpha")
 
-    def select(items, prompt, preserve_order):
+    def select(items: list[str], prompt: str, preserve_order: bool) -> list[str]:
         assert items == [
             f"# {source_a}",
             "  alpha",
@@ -34,7 +37,7 @@ def test_groups_skills_by_source_location(tmp_path):
     assert result == ["zulu"]
 
 
-def test_groups_unmanaged_skills_separately(tmp_path):
+def test_groups_unmanaged_skills_separately(tmp_path: Path) -> None:
     source = tmp_path / "source"
     (source / "managed").mkdir(parents=True)
     installed = tmp_path / "installed"
@@ -44,7 +47,7 @@ def test_groups_unmanaged_skills_separately(tmp_path):
     unmanaged = installed / "personal"
     unmanaged.mkdir()
 
-    def select(items, prompt, preserve_order):
+    def select(items: list[str], prompt: str, preserve_order: bool) -> list[str]:
         assert items == [
             f"# {source}",
             "  managed",
@@ -62,7 +65,9 @@ def test_groups_unmanaged_skills_separately(tmp_path):
     assert result == ["personal"]
 
 
-def test_groups_profile_stored_skills_as_unmanaged(tmp_path, monkeypatch):
+def test_groups_profile_stored_skills_as_unmanaged(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     store = tmp_path / "store"
     stored = store / "personal"
     stored.mkdir(parents=True)
@@ -72,7 +77,7 @@ def test_groups_profile_stored_skills_as_unmanaged(tmp_path, monkeypatch):
     personal.symlink_to(stored)
     monkeypatch.setattr("skillset.ui.get_profile_store_dir", lambda: store)
 
-    def select(items, prompt, preserve_order):
+    def select(items: list[str], prompt: str, preserve_order: bool) -> list[str]:
         assert items == ["# Unmanaged", "  personal"]
         return [items[1]]
 

@@ -2,10 +2,12 @@
 
 from unittest.mock import patch
 
+import pytest
+
 from skillset.ui import select_one
 
 
-def test_uses_fzf_when_available():
+def test_uses_fzf_when_available() -> None:
     with (
         patch("skillset.ui.shutil.which", return_value="/usr/bin/fzf"),
         patch("skillset.ui.fzf_select", return_value=["work"]) as fzf,
@@ -14,13 +16,13 @@ def test_uses_fzf_when_available():
     fzf.assert_called_once_with(["work", "minimal"], prompt="Profile> ")
 
 
-def test_numbered_fallback(monkeypatch):
+def test_numbered_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("builtins.input", lambda _prompt: "2")
     with patch("skillset.ui.shutil.which", return_value=None):
         assert select_one(["work", "minimal"]) == "minimal"
 
 
-def test_empty_input_cancels_numbered_fallback(monkeypatch):
+def test_empty_input_cancels_numbered_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("builtins.input", lambda _prompt: "")
     with patch("skillset.ui.shutil.which", return_value=None):
         assert select_one(["work"]) is None

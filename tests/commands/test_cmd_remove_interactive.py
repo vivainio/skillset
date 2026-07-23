@@ -1,12 +1,18 @@
 """Tests for skillset.commands.cmd_remove interactive mode."""
 
+from pathlib import Path
 from unittest.mock import patch
+
+import pytest
 
 from skillset.commands import cmd_remove
 from skillset.paths import load_skillset
+from tests.support import Env
 
 
-def test_interactive_selects_skills_to_remove(env, source_repo, capsys):
+def test_interactive_selects_skills_to_remove(
+    env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     skills_dir = env.home / ".claude" / "skills"
     skills_dir.mkdir(parents=True)
     (skills_dir / "skill-a").symlink_to(source_repo / "skill-a")
@@ -21,7 +27,9 @@ def test_interactive_selects_skills_to_remove(env, source_repo, capsys):
     assert "Removed skill-a" in output
 
 
-def test_interactive_removes_multiple(env, source_repo, capsys):
+def test_interactive_removes_multiple(
+    env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     skills_dir = env.home / ".claude" / "skills"
     skills_dir.mkdir(parents=True)
     (skills_dir / "skill-a").symlink_to(source_repo / "skill-a")
@@ -37,7 +45,7 @@ def test_interactive_removes_multiple(env, source_repo, capsys):
     assert not (skills_dir / "skill-b").exists()
 
 
-def test_interactive_persists_disabled_skills(env, source_repo):
+def test_interactive_persists_disabled_skills(env: Env, source_repo: Path) -> None:
     skills_dir = env.home / ".claude" / "skills"
     skills_dir.mkdir(parents=True)
     (skills_dir / "skill-a").symlink_to(source_repo / "skill-a")
@@ -56,7 +64,9 @@ def test_interactive_persists_disabled_skills(env, source_repo):
     assert list(entry["disabled"]) == ["skill-a"]
 
 
-def test_interactive_empty_selection(env, source_repo, capsys):
+def test_interactive_empty_selection(
+    env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     """When fzf returns empty, nothing is removed."""
     skills_dir = env.home / ".claude" / "skills"
     skills_dir.mkdir(parents=True)
@@ -68,7 +78,7 @@ def test_interactive_empty_selection(env, source_repo, capsys):
     assert (skills_dir / "skill-a").is_symlink()
 
 
-def test_interactive_no_managed_skills(env, capsys):
+def test_interactive_no_managed_skills(env: Env, capsys: pytest.CaptureFixture[str]) -> None:
     """When no skills exist, prints message and returns."""
     skills_dir = env.home / ".claude" / "skills"
     skills_dir.mkdir(parents=True)
@@ -79,7 +89,7 @@ def test_interactive_no_managed_skills(env, capsys):
     assert "No skills" in output
 
 
-def test_interactive_no_skills_dir(env, capsys):
+def test_interactive_no_skills_dir(env: Env, capsys: pytest.CaptureFixture[str]) -> None:
     """When skills dir doesn't exist, prints message and returns."""
     cmd_remove(interactive=True)
 
@@ -87,7 +97,7 @@ def test_interactive_no_skills_dir(env, capsys):
     assert "No skills" in output
 
 
-def test_interactive_removes_selected_unmanaged_skill(env):
+def test_interactive_removes_selected_unmanaged_skill(env: Env) -> None:
     skills_dir = env.home / ".claude" / "skills"
     unmanaged = skills_dir / "personal"
     unmanaged.mkdir(parents=True)
@@ -103,7 +113,9 @@ def test_interactive_removes_selected_unmanaged_skill(env):
     assert select.call_args.args[0] == [unmanaged]
 
 
-def test_interactive_shows_scope_in_prompt(env, source_repo, capsys, monkeypatch):
+def test_interactive_shows_scope_in_prompt(
+    env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Interactive mode shows 'project' scope when in local context."""
     monkeypatch.setattr("skillset.commands.remove.find_skillset_root", lambda: env.project)
     project_skills = env.project / ".claude" / "skills"
@@ -123,7 +135,9 @@ def test_interactive_shows_scope_in_prompt(env, source_repo, capsys, monkeypatch
     assert "project" in prompt
 
 
-def test_interactive_global_scope_prompt(env, source_repo, capsys):
+def test_interactive_global_scope_prompt(
+    env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     """Interactive mode shows 'global' scope when not in local context."""
     skills_dir = env.home / ".claude" / "skills"
     skills_dir.mkdir(parents=True)

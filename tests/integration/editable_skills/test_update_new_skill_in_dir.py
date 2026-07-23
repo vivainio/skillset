@@ -8,25 +8,27 @@ unless --yes/--no is passed explicitly. Global: interactive a/i/s menu.
 """
 
 import shutil
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
 from skillset.commands import cmd_update
 from skillset.paths import load_skillset
+from tests.support import Env, LocalEnv
 
 from .conftest import FIXTURES, installed_skills
 
 
 @pytest.fixture
-def editable_dir(tmp_path):
+def editable_dir(tmp_path: Path) -> Path:
     """Copy fixtures to a mutable dir and return it."""
     d = tmp_path / "editable-skills"
     shutil.copytree(FIXTURES, d)
     return d
 
 
-def _toml_text(editable_dir):
+def _toml_text(editable_dir: Path) -> str:
     return (
         "skills:\n"
         "  editable-skills:\n"
@@ -39,7 +41,7 @@ def _toml_text(editable_dir):
 class TestUpdateNewSkillLocal:
     """Local skillset.yaml -- no interactive suggestions, ever."""
 
-    def _setup(self, local_env, editable_dir):
+    def _setup(self, local_env: LocalEnv, editable_dir: Path) -> None:
         """Install all three original skills, then add two new ones to the dir."""
         local_env.toml_path.write_text(_toml_text(editable_dir))
 
@@ -51,7 +53,9 @@ class TestUpdateNewSkillLocal:
             skill_dir.mkdir()
             (skill_dir / "SKILL.md").write_text(f"# {name}\n")
 
-    def test_no_prompt_only_report(self, local_env, editable_dir, capsys):
+    def test_no_prompt_only_report(
+        self, local_env: LocalEnv, editable_dir: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         """Default local update reports new skills without prompting or linking."""
         self._setup(local_env, editable_dir)
         toml_before = local_env.toml_path.read_text()
@@ -71,7 +75,7 @@ class TestUpdateNewSkillLocal:
         assert "delta" in output
         assert "epsilon" in output
 
-    def test_yes_adds_all(self, local_env, editable_dir):
+    def test_yes_adds_all(self, local_env: LocalEnv, editable_dir: Path) -> None:
         """Explicit --yes links new skills and appends them to enabled."""
         self._setup(local_env, editable_dir)
 
@@ -87,7 +91,7 @@ class TestUpdateNewSkillLocal:
         assert "epsilon" in enabled
         assert "alpha" in enabled
 
-    def test_no_ignores_all(self, local_env, editable_dir):
+    def test_no_ignores_all(self, local_env: LocalEnv, editable_dir: Path) -> None:
         """Explicit --no skips new skills and appends them to disabled."""
         self._setup(local_env, editable_dir)
 
@@ -102,7 +106,7 @@ class TestUpdateNewSkillLocal:
         assert "delta" in disabled
         assert "epsilon" in disabled
 
-    def test_original_skills_preserved(self, local_env, editable_dir):
+    def test_original_skills_preserved(self, local_env: LocalEnv, editable_dir: Path) -> None:
         """Original skills remain linked regardless of new skill handling."""
         self._setup(local_env, editable_dir)
 
@@ -115,7 +119,7 @@ class TestUpdateNewSkillLocal:
 class TestUpdateNewSkillGlobal:
     """Global skillset.yaml keeps the interactive a/i/s menu."""
 
-    def _setup(self, env, editable_dir):
+    def _setup(self, env: Env, editable_dir: Path) -> tuple[Path, Path]:
         toml_path = env.home / ".claude" / "skillset.yaml"
         toml_path.write_text(_toml_text(editable_dir))
 
@@ -129,7 +133,9 @@ class TestUpdateNewSkillGlobal:
             (skill_dir / "SKILL.md").write_text(f"# {name}\n")
         return toml_path, skills_dir
 
-    def test_add_all(self, env, editable_dir, capsys):
+    def test_add_all(
+        self, env: Env, editable_dir: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         """User chooses 'a' -- both new skills linked and appended to enabled."""
         toml_path, skills_dir = self._setup(env, editable_dir)
 
@@ -149,7 +155,9 @@ class TestUpdateNewSkillGlobal:
         assert "New skills detected" in output
         assert "2 new skill(s)" in output
 
-    def test_ignore_all(self, env, editable_dir, capsys):
+    def test_ignore_all(
+        self, env: Env, editable_dir: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         """User chooses 'i' -- neither new skill linked, appended to disabled."""
         toml_path, skills_dir = self._setup(env, editable_dir)
 
@@ -168,7 +176,7 @@ class TestUpdateNewSkillGlobal:
         output = capsys.readouterr().out
         assert "skipped" in output
 
-    def test_select_individually(self, env, editable_dir):
+    def test_select_individually(self, env: Env, editable_dir: Path) -> None:
         """User chooses 's', then accepts delta and rejects epsilon."""
         toml_path, skills_dir = self._setup(env, editable_dir)
 

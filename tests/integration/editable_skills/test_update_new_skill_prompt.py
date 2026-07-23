@@ -1,13 +1,16 @@
 """After removing a skill entry from a local yaml, update reports it -- no prompt."""
 
+import pytest
+
 from skillset.commands import cmd_add, cmd_update
 from skillset.paths import load_skillset
+from tests.support import LocalEnv
 
 from .conftest import FIXTURES, remove_skill_from_toml
 
 
 class TestLocalUpdateUntrackedSkill:
-    def _setup(self, local_env):
+    def _setup(self, local_env: LocalEnv) -> None:
         """Add two editable skills (gamma marked disabled), then drop gamma from yaml."""
         cmd_add(repo=str(FIXTURES), skills=["alpha", "beta"])
 
@@ -22,7 +25,9 @@ class TestLocalUpdateUntrackedSkill:
         assert "gamma" not in entry.get("enabled", [])
         assert "gamma" not in entry.get("disabled", [])
 
-    def test_reported_not_prompted(self, local_env, capsys):
+    def test_reported_not_prompted(
+        self, local_env: LocalEnv, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         """Default local update reports gamma without prompting or touching yaml."""
         self._setup(local_env)
 
@@ -39,7 +44,7 @@ class TestLocalUpdateUntrackedSkill:
         assert "New skills available" in output
         assert "gamma" in output
 
-    def test_yes_accepts_new_skill(self, local_env):
+    def test_yes_accepts_new_skill(self, local_env: LocalEnv) -> None:
         """--yes links gamma and appends it to enabled."""
         self._setup(local_env)
 
@@ -52,7 +57,9 @@ class TestLocalUpdateUntrackedSkill:
         assert "alpha" in entry["enabled"]
         assert "gamma" in entry["enabled"]
 
-    def test_no_rejects_new_skill(self, local_env, capsys):
+    def test_no_rejects_new_skill(
+        self, local_env: LocalEnv, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         """--no keeps gamma unlinked and appends it to disabled."""
         self._setup(local_env)
 
@@ -66,7 +73,7 @@ class TestLocalUpdateUntrackedSkill:
         output = capsys.readouterr().out
         assert "skipped" in output
 
-    def test_existing_skills_preserved(self, local_env):
+    def test_existing_skills_preserved(self, local_env: LocalEnv) -> None:
         """Alpha and beta remain linked regardless of gamma handling."""
         self._setup(local_env)
 

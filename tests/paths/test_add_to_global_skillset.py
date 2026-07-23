@@ -1,9 +1,11 @@
 """Tests for skillset.paths.add_to_global_skillset."""
 
+from pathlib import Path
+
 from skillset.paths import add_to_global_skillset, load_skillset
 
 
-def test_creates_entry(home_dir):
+def test_creates_entry(home_dir: Path) -> None:
     toml_path = home_dir / ".claude" / "skillset.yaml"
     toml_path.parent.mkdir(parents=True)
     toml_path.write_text("skills: {}\n")
@@ -16,7 +18,7 @@ def test_creates_entry(home_dir):
     assert list(data["skills"]["owner/repo"]["enabled"]) == ["*"]
 
 
-def test_no_duplicate(home_dir):
+def test_no_duplicate(home_dir: Path) -> None:
     toml_path = home_dir / ".claude" / "skillset.yaml"
     toml_path.parent.mkdir(parents=True)
     toml_path.write_text("skills:\n  owner/repo:\n    enabled: ['*']\n")
@@ -25,19 +27,17 @@ def test_no_duplicate(home_dir):
     assert result is False
 
 
-def test_no_file(home_dir):
+def test_no_file(home_dir: Path) -> None:
     result = add_to_global_skillset("owner/repo", enabled=["*"])
     assert result is False
 
 
-def test_with_skills(home_dir):
+def test_with_skills(home_dir: Path) -> None:
     toml_path = home_dir / ".claude" / "skillset.yaml"
     toml_path.parent.mkdir(parents=True)
     toml_path.write_text("skills: {}\n")
 
-    result = add_to_global_skillset(
-        "owner/repo", enabled=["skill-a"], disabled=["skill-b"]
-    )
+    result = add_to_global_skillset("owner/repo", enabled=["skill-a"], disabled=["skill-b"])
     assert result is True
 
     data = load_skillset(toml_path)
@@ -46,7 +46,7 @@ def test_with_skills(home_dir):
     assert list(entry["disabled"]) == ["skill-b"]
 
 
-def test_editable(home_dir):
+def test_editable(home_dir: Path) -> None:
     toml_path = home_dir / ".claude" / "skillset.yaml"
     toml_path.parent.mkdir(parents=True)
     toml_path.write_text("skills: {}\n")
@@ -62,7 +62,7 @@ def test_editable(home_dir):
     assert entry["source"] == "~/local/skills"
 
 
-def test_snapshot_with_ref(home_dir):
+def test_snapshot_with_ref(home_dir: Path) -> None:
     toml_path = home_dir / ".claude" / "skillset.yaml"
     toml_path.parent.mkdir(parents=True)
     toml_path.write_text("skills: {}\n")

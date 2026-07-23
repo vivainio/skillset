@@ -3,12 +3,13 @@
 from unittest.mock import patch
 
 from skillset.commands import cmd_add
+from tests.support import Env
 
 from .conftest import repo_skills
 
 
 class TestAddWithGitHubUrl:
-    def test_full_url(self, env):
+    def test_full_url(self, env: Env) -> None:
         with patch("builtins.input", return_value="y"):
             cmd_add(repo="https://github.com/vivainio/agent-skills")
 
@@ -18,7 +19,7 @@ class TestAddWithGitHubUrl:
         assert expected
         assert expected.issubset(installed)
 
-    def test_url_with_tree_subpath(self, env):
+    def test_url_with_tree_subpath(self, env: Env) -> None:
         with patch("builtins.input", return_value="y"):
             cmd_add(repo="https://github.com/vivainio/agent-skills/tree/main/extra-skills")
 

@@ -4,7 +4,7 @@ from importlib.metadata import PackageNotFoundError
 from unittest.mock import patch
 
 
-def test_version_fallback_when_not_installed():
+def test_version_fallback_when_not_installed() -> None:
     with patch("importlib.metadata.version", side_effect=PackageNotFoundError):
         # Re-import to trigger the except branch
         import importlib
@@ -15,7 +15,7 @@ def test_version_fallback_when_not_installed():
         assert skillset.__version__ == "0.0.0"
 
 
-def test_version_from_metadata():
+def test_version_from_metadata() -> None:
     import skillset
 
     # When installed, version comes from metadata

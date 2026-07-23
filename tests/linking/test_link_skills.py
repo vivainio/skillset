@@ -1,9 +1,13 @@
 """Tests for skillset.linking.link_skills."""
 
+from pathlib import Path
+
+import pytest
+
 from skillset.linking import copy_dir, is_managed_copy, link_skills
 
 
-def test_copy_mode(skill_repo, tmp_path):
+def test_copy_mode(skill_repo: Path, tmp_path: Path) -> None:
     target = tmp_path / "skills"
     linked = link_skills(skill_repo, target, copy=True)
     assert sorted(linked) == ["skill-a", "skill-b"]
@@ -11,34 +15,34 @@ def test_copy_mode(skill_repo, tmp_path):
     assert is_managed_copy(target / "skill-a")
 
 
-def test_symlink_mode(skill_repo, tmp_path):
+def test_symlink_mode(skill_repo: Path, tmp_path: Path) -> None:
     target = tmp_path / "skills"
     linked = link_skills(skill_repo, target)
     assert sorted(linked) == ["skill-a", "skill-b"]
     assert (target / "skill-a").is_symlink()
 
 
-def test_with_filter(skill_repo, tmp_path):
+def test_with_filter(skill_repo: Path, tmp_path: Path) -> None:
     target = tmp_path / "skills"
     linked = link_skills(skill_repo, target, only={"skill-a"}, copy=True)
     assert linked == ["skill-a"]
     assert not (target / "skill-b").exists()
 
 
-def test_glob_filter(skill_repo, tmp_path):
+def test_glob_filter(skill_repo: Path, tmp_path: Path) -> None:
     target = tmp_path / "skills"
     linked = link_skills(skill_repo, target, only={"skill-*"}, copy=True)
     assert sorted(linked) == ["skill-a", "skill-b"]
 
 
-def test_percent_wildcard_alias(skill_repo, tmp_path):
+def test_percent_wildcard_alias(skill_repo: Path, tmp_path: Path) -> None:
     """`%` is accepted as a shell-safe alias for `*`."""
     target = tmp_path / "skills"
     linked = link_skills(skill_repo, target, only={"skill-%"}, copy=True)
     assert sorted(linked) == ["skill-a", "skill-b"]
 
 
-def test_existing_only(skill_repo, tmp_path):
+def test_existing_only(skill_repo: Path, tmp_path: Path) -> None:
     target = tmp_path / "skills"
     target.mkdir(parents=True)
     copy_dir(skill_repo / "skill-a", target / "skill-a")
@@ -47,7 +51,7 @@ def test_existing_only(skill_repo, tmp_path):
     assert linked == ["skill-a"]
 
 
-def test_subfolder_target(skill_repo, tmp_path):
+def test_subfolder_target(skill_repo: Path, tmp_path: Path) -> None:
     """Skills are installed into a subfolder when target_dir includes it."""
     target = tmp_path / "skills" / "database"
     linked = link_skills(skill_repo, target, copy=True)
@@ -57,7 +61,7 @@ def test_subfolder_target(skill_repo, tmp_path):
     assert target.parent.exists()
 
 
-def test_replaces_existing_managed(skill_repo, tmp_path):
+def test_replaces_existing_managed(skill_repo: Path, tmp_path: Path) -> None:
     target = tmp_path / "skills"
     # First install as copy
     link_skills(skill_repo, target, copy=True)
@@ -66,7 +70,9 @@ def test_replaces_existing_managed(skill_repo, tmp_path):
     assert sorted(linked) == ["skill-a", "skill-b"]
 
 
-def test_skips_unmanaged_existing(skill_repo, tmp_path, capsys):
+def test_skips_unmanaged_existing(
+    skill_repo: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     target = tmp_path / "skills"
     target.mkdir(parents=True)
     # Create a non-managed dir with same name
@@ -81,7 +87,9 @@ def test_skips_unmanaged_existing(skill_repo, tmp_path, capsys):
     assert "not managed by skillset" in output
 
 
-def test_fuzzy_match_suggestion(skill_repo, tmp_path, capsys):
+def test_fuzzy_match_suggestion(
+    skill_repo: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     target = tmp_path / "skills"
     link_skills(skill_repo, target, only={"skill-"}, copy=True)
     # "skill-" doesn't exactly match or glob-match, fuzzy should suggest
@@ -89,7 +97,9 @@ def test_fuzzy_match_suggestion(skill_repo, tmp_path, capsys):
     assert "not found" in output
 
 
-def test_no_match_no_suggestion(skill_repo, tmp_path, capsys):
+def test_no_match_no_suggestion(
+    skill_repo: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     target = tmp_path / "skills"
     linked = link_skills(skill_repo, target, only={"zzzzz"}, copy=True)
     assert linked == []
@@ -97,7 +107,9 @@ def test_no_match_no_suggestion(skill_repo, tmp_path, capsys):
     assert "no close match" in output
 
 
-def test_glob_no_match(skill_repo, tmp_path, capsys):
+def test_glob_no_match(
+    skill_repo: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     target = tmp_path / "skills"
     linked = link_skills(skill_repo, target, only={"zzz-*"}, copy=True)
     assert linked == []
@@ -105,7 +117,7 @@ def test_glob_no_match(skill_repo, tmp_path, capsys):
     assert "matched no skills" in output
 
 
-def test_source_label(skill_repo, tmp_path):
+def test_source_label(skill_repo: Path, tmp_path: Path) -> None:
     target = tmp_path / "skills"
     link_skills(skill_repo, target, copy=True, source_label="custom/label")
     from skillset.linking import get_copy_source
@@ -113,7 +125,7 @@ def test_source_label(skill_repo, tmp_path):
     assert get_copy_source(target / "skill-a") == "custom/label"
 
 
-def test_existing_only_with_only_set(skill_repo, tmp_path):
+def test_existing_only_with_only_set(skill_repo: Path, tmp_path: Path) -> None:
     """existing_only intersects with the explicit only set."""
     target = tmp_path / "skills"
     target.mkdir(parents=True)

@@ -6,7 +6,7 @@ from unittest.mock import patch
 from skillset.repo import clone_to_temp
 
 
-def test_clones_to_temp_directory():
+def test_clones_to_temp_directory() -> None:
     with patch("skillset.repo.subprocess.run") as mock_run:
         mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
         result = clone_to_temp("owner", "repo")
@@ -18,7 +18,7 @@ def test_clones_to_temp_directory():
     assert "1" in args
 
 
-def test_ssh_fallback_on_auth_failure():
+def test_ssh_fallback_on_auth_failure() -> None:
     with patch("skillset.repo.subprocess.run") as mock_run:
         mock_run.side_effect = [
             subprocess.CalledProcessError(128, "git clone", stderr=b"Authentication failed"),
@@ -32,7 +32,7 @@ def test_ssh_fallback_on_auth_failure():
     assert "git@github.com:owner/repo.git" in ssh_args
 
 
-def test_non_auth_error_raises():
+def test_non_auth_error_raises() -> None:
     import pytest
 
     with patch("skillset.repo.subprocess.run") as mock_run:

@@ -1,13 +1,17 @@
 """Tests for skillset.commands.cmd_add."""
 
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
 from skillset.commands import cmd_add
+from tests.support import Env
 
 
-def test_add_from_local_path(env, source_repo, capsys):
+def test_add_from_local_path(
+    env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     with patch("builtins.input", return_value="y"):
         cmd_add(repo=str(source_repo))
 
@@ -18,7 +22,7 @@ def test_add_from_local_path(env, source_repo, capsys):
     assert "Linked" in output
 
 
-def test_add_local_subdir_reuses_registered_editable_root(env, source_repo):
+def test_add_local_subdir_reuses_registered_editable_root(env: Env, source_repo: Path) -> None:
     yaml_path = env.home / ".claude" / "skillset.yaml"
     yaml_path.write_text(
         "skills:\n"
@@ -37,7 +41,9 @@ def test_add_local_subdir_reuses_registered_editable_root(env, source_repo):
     assert set(entries["owner/repo"]["enabled"]) == {"existing", "skill-a"}
 
 
-def test_add_with_skill_filter(env, source_repo, capsys):
+def test_add_with_skill_filter(
+    env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     cmd_add(repo=str(source_repo), skills=["skill-a"])
 
     skills_dir = env.home / ".claude" / "skills"
@@ -45,7 +51,7 @@ def test_add_with_skill_filter(env, source_repo, capsys):
     assert not (skills_dir / "skill-b").exists()
 
 
-def test_add_copy_mode(env, source_repo, capsys):
+def test_add_copy_mode(env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
     with patch("builtins.input", return_value="y"):
         cmd_add(repo=str(source_repo), copy=True)
 
@@ -56,7 +62,9 @@ def test_add_copy_mode(env, source_repo, capsys):
     assert "Copied" in output
 
 
-def test_add_from_owner_repo(env, source_repo, capsys):
+def test_add_from_owner_repo(
+    env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     with patch("skillset.commands._resolve.clone_or_pull", return_value=source_repo):
         with patch("skillset.commands._resolve.get_repo_dir", return_value=source_repo):
             with patch("skillset.commands._resolve.is_link", return_value=False):
@@ -67,12 +75,14 @@ def test_add_from_owner_repo(env, source_repo, capsys):
     assert "Linked" in output
 
 
-def test_add_no_repo_exits(env):
+def test_add_no_repo_exits(env: Env) -> None:
     with pytest.raises(SystemExit):
         cmd_add()
 
 
-def test_add_fetch_links_nothing(env, source_repo, capsys):
+def test_add_fetch_links_nothing(
+    env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     cmd_add(repo=str(source_repo), fetch=True)
 
     skills_dir = env.home / ".claude" / "skills"
@@ -81,7 +91,7 @@ def test_add_fetch_links_nothing(env, source_repo, capsys):
     assert "Fetched" in output
 
 
-def test_add_fetch_registers_with_no_skills_enabled(env, source_repo):
+def test_add_fetch_registers_with_no_skills_enabled(env: Env, source_repo: Path) -> None:
     cmd_add(repo=str(source_repo), fetch=True)
 
     toml_path = env.home / ".claude" / "skillset.yaml"
@@ -93,7 +103,9 @@ def test_add_fetch_registers_with_no_skills_enabled(env, source_repo):
     assert set(entry["disabled"]) == {"skill-a", "skill-b"}
 
 
-def test_add_global_flag_skips_local_detection(env, source_repo, capsys):
+def test_add_global_flag_skips_local_detection(
+    env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     """With --global, skills go to global dir even when skillset.toml exists."""
     with patch("builtins.input", return_value="y"):
         cmd_add(repo=str(source_repo), g=True)
@@ -102,22 +114,22 @@ def test_add_global_flag_skips_local_detection(env, source_repo, capsys):
     assert (skills_dir / "skill-a").is_symlink()
 
 
-def test_add_local_path_not_found_exits(env):
+def test_add_local_path_not_found_exits(env: Env) -> None:
     with pytest.raises(SystemExit):
         cmd_add(repo="/nonexistent/path")
 
 
-def test_add_invalid_github_url_exits(env):
+def test_add_invalid_github_url_exits(env: Env) -> None:
     with pytest.raises(SystemExit):
         cmd_add(repo="https://gitlab.com/owner/repo")
 
 
-def test_add_invalid_repo_spec_exits(env):
+def test_add_invalid_repo_spec_exits(env: Env) -> None:
     with pytest.raises(SystemExit):
         cmd_add(repo="invalid-spec")
 
 
-def test_add_with_subpath(env, source_repo, capsys):
+def test_add_with_subpath(env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
     # Create a subpath
     sub = source_repo / "sub"
     skill = sub / "sub-skill"
@@ -131,12 +143,12 @@ def test_add_with_subpath(env, source_repo, capsys):
     assert (skills_dir / "sub-skill").is_symlink()
 
 
-def test_add_subpath_not_found_exits(env, source_repo):
+def test_add_subpath_not_found_exits(env: Env, source_repo: Path) -> None:
     with pytest.raises(SystemExit):
         cmd_add(repo=str(source_repo), subpath="nonexistent")
 
 
-def test_add_no_cache_mode(env, source_repo, capsys):
+def test_add_no_cache_mode(env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
     with patch("skillset.commands._resolve.clone_to_temp", return_value=source_repo):
         with patch("builtins.input", return_value="y"):
             cmd_add(repo="owner/repo", no_cache=True)
@@ -145,7 +157,7 @@ def test_add_no_cache_mode(env, source_repo, capsys):
     assert "Copied" in output
 
 
-def test_add_github_url(env, source_repo, capsys):
+def test_add_github_url(env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
     with patch("skillset.commands._resolve.clone_or_pull", return_value=source_repo):
         with patch("skillset.commands._resolve.get_repo_dir", return_value=source_repo):
             with patch("skillset.commands._resolve.is_link", return_value=False):
@@ -156,7 +168,7 @@ def test_add_github_url(env, source_repo, capsys):
     assert "Linked" in output
 
 
-def test_add_trial(env, source_repo, capsys):
+def test_add_trial(env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
     with patch("builtins.input", return_value="y"):
         cmd_add(repo=str(source_repo), trial=True)
 
@@ -167,7 +179,7 @@ def test_add_trial(env, source_repo, capsys):
         assert opts.get("trial") is True
 
 
-def test_add_skill_by_name(env, source_repo, capsys):
+def test_add_skill_by_name(env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
     # Set up skillset.yaml with editable entry
     yaml_path = env.home / ".claude" / "skillset.yaml"
     yaml_path.write_text(f"skills:\n  my-lib:\n    editable: true\n    source: {source_repo}\n")
@@ -178,7 +190,7 @@ def test_add_skill_by_name(env, source_repo, capsys):
     assert (skills_dir / "skill-a").is_symlink()
 
 
-def test_add_skill_name_not_found_exits(env):
+def test_add_skill_name_not_found_exits(env: Env) -> None:
     yaml_path = env.home / ".claude" / "skillset.yaml"
     yaml_path.write_text("skills: {}\n")
 
@@ -186,7 +198,9 @@ def test_add_skill_name_not_found_exits(env):
         cmd_add(repo="nonexistent")
 
 
-def test_add_glob_filter_persists_pattern(env, source_repo, capsys):
+def test_add_glob_filter_persists_pattern(
+    env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     """A glob in -s links matching skills and persists the pattern (not the
     expanded names) so `update` re-expands it later. `%` is the shell-safe alias."""
     yaml_path = env.home / ".claude" / "skillset.yaml"
@@ -207,7 +221,9 @@ def test_add_glob_filter_persists_pattern(env, source_repo, capsys):
     assert entry["enabled"] == ["skill-*"]
 
 
-def test_add_registers_in_skillset_yaml(env, source_repo, capsys):
+def test_add_registers_in_skillset_yaml(
+    env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     yaml_path = env.home / ".claude" / "skillset.yaml"
     yaml_path.write_text("skills: {}\n")
 
@@ -223,7 +239,9 @@ def test_add_registers_in_skillset_yaml(env, source_repo, capsys):
     assert "owner/repo" in data.get("skills", {})
 
 
-def test_add_empty_repo_reports_nothing(env, tmp_path, capsys):
+def test_add_empty_repo_reports_nothing(
+    env: Env, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     empty_repo = tmp_path / "empty"
     empty_repo.mkdir()
 
@@ -233,7 +251,9 @@ def test_add_empty_repo_reports_nothing(env, tmp_path, capsys):
     assert "No skills found in repo" in output
 
 
-def test_add_links_skills_from_repo_with_settings(env, source_repo, capsys):
+def test_add_links_skills_from_repo_with_settings(
+    env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     """Skills are linked even when repo contains a settings.json."""
     import json
 
@@ -248,7 +268,9 @@ def test_add_links_skills_from_repo_with_settings(env, source_repo, capsys):
     assert "Linked" in output
 
 
-def test_add_github_url_no_cache(env, source_repo, capsys):
+def test_add_github_url_no_cache(
+    env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     with patch("skillset.commands._resolve.clone_to_temp", return_value=source_repo):
         with patch("builtins.input", return_value="y"):
             cmd_add(repo="https://github.com/owner/repo", no_cache=True)
@@ -257,7 +279,9 @@ def test_add_github_url_no_cache(env, source_repo, capsys):
     assert "Copied" in output
 
 
-def test_add_linked_repo_dir(env, source_repo, capsys):
+def test_add_linked_repo_dir(
+    env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     """When repo_dir is already a symlink, resolve it."""
     cache_dir = env.home / ".cache" / "skillset" / "repos" / "owner"
     cache_dir.mkdir(parents=True)
@@ -271,7 +295,9 @@ def test_add_linked_repo_dir(env, source_repo, capsys):
     assert "Linked" in output
 
 
-def test_add_github_url_linked_repo(env, source_repo, capsys):
+def test_add_github_url_linked_repo(
+    env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     """GitHub URL when cached repo is a symlink."""
     cache_dir = env.home / ".cache" / "skillset" / "repos" / "owner"
     cache_dir.mkdir(parents=True)
@@ -285,7 +311,9 @@ def test_add_github_url_linked_repo(env, source_repo, capsys):
     assert "Linked" in output
 
 
-def test_add_from_cached_repo(env, source_repo, capsys):
+def test_add_from_cached_repo(
+    env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     """When repo_dir is inside cache_dir, repo_key uses relative path."""
     cache_dir = env.home / ".cache" / "skillset" / "repos" / "owner" / "repo"
     cache_dir.mkdir(parents=True)
@@ -307,7 +335,9 @@ def test_add_from_cached_repo(env, source_repo, capsys):
     assert "Linked" in output
 
 
-def test_unsnapshot_clears_ref_and_flag(env, source_repo, capsys):
+def test_unsnapshot_clears_ref_and_flag(
+    env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     """--unsnapshot drops snapshot+ref from yaml and re-links as symlinks."""
     yaml_file = env.home / ".claude" / "skillset.yaml"
     yaml_file.write_text(
@@ -331,6 +361,6 @@ def test_unsnapshot_clears_ref_and_flag(env, source_repo, capsys):
     assert (skills_dir / "skill-a").is_symlink()
 
 
-def test_snapshot_and_unsnapshot_mutually_exclusive(env):
+def test_snapshot_and_unsnapshot_mutually_exclusive(env: Env) -> None:
     with pytest.raises(SystemExit):
         cmd_add(repo="owner/repo", snapshot=True, unsnapshot=True)

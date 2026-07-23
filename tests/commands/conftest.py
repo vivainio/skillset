@@ -4,9 +4,11 @@ from pathlib import Path
 
 import pytest
 
+from tests.support import Env
+
 
 @pytest.fixture
-def env(tmp_path, monkeypatch):
+def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Env:
     """Isolated environment: redirects home, git root, and mocks subprocess for git."""
     home = tmp_path / "home"
     project = tmp_path / "project"
@@ -27,11 +29,11 @@ def env(tmp_path, monkeypatch):
     # Create global dirs
     (home / ".claude").mkdir(parents=True)
 
-    return type("Env", (), {"home": home, "project": project, "tmp": tmp_path})()
+    return Env(home=home, project=project, tmp=tmp_path)
 
 
 @pytest.fixture
-def source_repo(tmp_path):
+def source_repo(tmp_path: Path) -> Path:
     """A fake source repo with skills and commands."""
     repo = tmp_path / "source_repo"
     for name in ("skill-a", "skill-b"):

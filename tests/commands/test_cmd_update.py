@@ -1,20 +1,22 @@
 """Tests for skillset.commands.cmd_update."""
 
 import subprocess
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
 from skillset.commands import cmd_update
 from skillset.commands.update import _changed_skill_names
+from tests.support import Env
 
 
-def test_no_file_exits(env):
+def test_no_file_exits(env: Env) -> None:
     with pytest.raises(SystemExit):
         cmd_update()
 
 
-def test_empty_skills_section(env, capsys):
+def test_empty_skills_section(env: Env, capsys: pytest.CaptureFixture[str]) -> None:
     yaml_file = env.home / ".claude" / "skillset.yaml"
     yaml_file.write_text("skills: {}\n")
 
@@ -23,7 +25,9 @@ def test_empty_skills_section(env, capsys):
     assert "No skills entries" in output
 
 
-def test_sync_wildcard_entry(env, source_repo, capsys):
+def test_sync_wildcard_entry(
+    env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     yaml_file = env.home / ".claude" / "skillset.yaml"
     yaml_file.write_text("skills:\n  owner/repo:\n    enabled: ['*']\n")
 
@@ -35,7 +39,9 @@ def test_sync_wildcard_entry(env, source_repo, capsys):
     assert "skill-a" in output
 
 
-def test_sync_glob_pattern_matches(env, source_repo, capsys):
+def test_sync_glob_pattern_matches(
+    env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     """enabled = ["skill-*"] expands to every skill in source (both skill-a and skill-b)."""
     yaml_file = env.home / ".claude" / "skillset.yaml"
     yaml_file.write_text("skills:\n  owner/repo:\n    enabled: ['skill-*']\n")
@@ -48,7 +54,9 @@ def test_sync_glob_pattern_matches(env, source_repo, capsys):
     assert "+ skill-b" in output
 
 
-def test_sync_glob_with_disabled_subtraction(env, source_repo, capsys):
+def test_sync_glob_with_disabled_subtraction(
+    env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     """Pattern on enabled minus an explicit disabled entry."""
     yaml_file = env.home / ".claude" / "skillset.yaml"
     yaml_file.write_text(
@@ -63,7 +71,9 @@ def test_sync_glob_with_disabled_subtraction(env, source_repo, capsys):
     assert "+ skill-b" not in output
 
 
-def test_sync_glob_does_not_cover_unrelated_new_skills(env, source_repo, capsys):
+def test_sync_glob_does_not_cover_unrelated_new_skills(
+    env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     """enabled=['skill-a*'] only covers skill-a; skill-b is still new and prompts."""
     yaml_file = env.home / ".claude" / "skillset.yaml"
     yaml_file.write_text("skills:\n  owner/repo:\n    enabled: ['skill-a*']\n")
@@ -78,7 +88,9 @@ def test_sync_glob_does_not_cover_unrelated_new_skills(env, source_repo, capsys)
     assert "skill-b" in output
 
 
-def test_sync_all_disabled_links_nothing(env, source_repo, capsys):
+def test_sync_all_disabled_links_nothing(
+    env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     """enabled=[] with every source skill in disabled links nothing and does not prompt."""
     yaml_file = env.home / ".claude" / "skillset.yaml"
     yaml_file.write_text(
@@ -93,7 +105,7 @@ def test_sync_all_disabled_links_nothing(env, source_repo, capsys):
     assert "New skills detected" not in output
 
 
-def test_sync_invalid_repo_spec(env, capsys):
+def test_sync_invalid_repo_spec(env: Env, capsys: pytest.CaptureFixture[str]) -> None:
     yaml_file = env.home / ".claude" / "skillset.yaml"
     yaml_file.write_text("skills:\n  invalid:\n    enabled: ['*']\n")
 
@@ -102,7 +114,9 @@ def test_sync_invalid_repo_spec(env, capsys):
     assert "Invalid repo format" in output
 
 
-def test_sync_dict_entry_all_skills(env, source_repo, capsys):
+def test_sync_dict_entry_all_skills(
+    env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     yaml_file = env.home / ".claude" / "skillset.yaml"
     yaml_file.write_text("skills:\n  owner/repo:\n    enabled: ['*']\n")
 
@@ -113,7 +127,9 @@ def test_sync_dict_entry_all_skills(env, source_repo, capsys):
     assert "Updating owner/repo" in output
 
 
-def test_sync_selective_skills(env, source_repo, capsys):
+def test_sync_selective_skills(
+    env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     yaml_file = env.home / ".claude" / "skillset.yaml"
     yaml_file.write_text(
         "skills:\n  owner/repo:\n    enabled: [skill-a]\n    disabled: [skill-b]\n"
@@ -126,7 +142,9 @@ def test_sync_selective_skills(env, source_repo, capsys):
     assert "skill-a" in output
 
 
-def test_sync_detects_new_skills(env, source_repo, capsys):
+def test_sync_detects_new_skills(
+    env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     yaml_file = env.home / ".claude" / "skillset.yaml"
     # Only track skill-a, leaving skill-b as "new"
     yaml_file.write_text("skills:\n  owner/repo:\n    enabled: [skill-a]\n")
@@ -140,7 +158,9 @@ def test_sync_detects_new_skills(env, source_repo, capsys):
     assert "skill-b" in output
 
 
-def test_sync_removes_excluded_skills(env, source_repo, capsys):
+def test_sync_removes_excluded_skills(
+    env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     skills_dir = env.home / ".claude" / "skills"
     skills_dir.mkdir(parents=True)
     (skills_dir / "skill-b").symlink_to(source_repo / "skill-b")
@@ -158,7 +178,9 @@ def test_sync_removes_excluded_skills(env, source_repo, capsys):
     assert "skill-b" not in output
 
 
-def test_sync_does_not_remove_excluded_skill_owned_by_other_source(env, source_repo, tmp_path):
+def test_sync_does_not_remove_excluded_skill_owned_by_other_source(
+    env: Env, source_repo: Path, tmp_path: Path
+) -> None:
     other_source = tmp_path / "other-source"
     other_skill = other_source / "skill-b"
     other_skill.mkdir(parents=True)
@@ -180,7 +202,9 @@ def test_sync_does_not_remove_excluded_skill_owned_by_other_source(env, source_r
     assert installed.resolve() == other_skill
 
 
-def test_sync_reports_only_skills_changed_by_pull(env, source_repo, capsys):
+def test_sync_reports_only_skills_changed_by_pull(
+    env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     skills_dir = env.home / ".claude" / "skills"
     skills_dir.mkdir(parents=True)
     for name in ("skill-a", "skill-b"):
@@ -198,7 +222,7 @@ def test_sync_reports_only_skills_changed_by_pull(env, source_repo, capsys):
     assert "skill-b" not in output
 
 
-def test_changed_skill_names_maps_git_changes_to_skill_dirs(source_repo):
+def test_changed_skill_names_maps_git_changes_to_skill_dirs(source_repo: Path) -> None:
     subprocess.run(["git", "init", "-q"], cwd=source_repo, check=True)
     subprocess.run(["git", "add", "."], cwd=source_repo, check=True)
     subprocess.run(
@@ -243,7 +267,7 @@ def test_changed_skill_names_maps_git_changes_to_skill_dirs(source_repo):
     assert _changed_skill_names(source_repo, source_repo, old_head) == {"skill-a"}
 
 
-def test_sync_editable(env, source_repo, capsys):
+def test_sync_editable(env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
     yaml_file = env.home / ".claude" / "skillset.yaml"
     yaml_file.write_text(f"skills:\n  my-lib:\n    editable: true\n    source: {source_repo}\n")
 
@@ -252,7 +276,7 @@ def test_sync_editable(env, source_repo, capsys):
     assert "editable" in output
 
 
-def test_sync_editable_missing_source(env, capsys):
+def test_sync_editable_missing_source(env: Env, capsys: pytest.CaptureFixture[str]) -> None:
     yaml_file = env.home / ".claude" / "skillset.yaml"
     yaml_file.write_text("skills:\n  my-lib:\n    editable: true\n")
 
@@ -261,7 +285,7 @@ def test_sync_editable_missing_source(env, capsys):
     assert "requires 'source' path" in output
 
 
-def test_sync_editable_source_not_found(env, capsys):
+def test_sync_editable_source_not_found(env: Env, capsys: pytest.CaptureFixture[str]) -> None:
     yaml_file = env.home / ".claude" / "skillset.yaml"
     yaml_file.write_text("skills:\n  my-lib:\n    editable: true\n    source: /nonexistent\n")
 
@@ -273,7 +297,9 @@ def test_sync_editable_source_not_found(env, capsys):
     assert "skillset update --repair" in output
 
 
-def test_repair_disables_unmanaged_destination_without_removing_it(env, source_repo, capsys):
+def test_repair_disables_unmanaged_destination_without_removing_it(
+    env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     skills_dir = env.home / ".claude" / "skills"
     unmanaged = skills_dir / "skill-a"
     unmanaged.mkdir(parents=True)
@@ -298,7 +324,7 @@ def test_repair_disables_unmanaged_destination_without_removing_it(env, source_r
     assert "skill-a" not in capsys.readouterr().out
 
 
-def test_sync_invalid_value_type(env, capsys):
+def test_sync_invalid_value_type(env: Env, capsys: pytest.CaptureFixture[str]) -> None:
     yaml_file = env.home / ".claude" / "skillset.yaml"
     yaml_file.write_text("skills:\n  repo: 42\n")
 
@@ -307,7 +333,7 @@ def test_sync_invalid_value_type(env, capsys):
     assert "must be a sub-table" in output
 
 
-def test_sync_with_path(env, source_repo, capsys):
+def test_sync_with_path(env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
     sub = source_repo / "sub"
     skill = sub / "nested-skill"
     skill.mkdir(parents=True)
@@ -323,7 +349,9 @@ def test_sync_with_path(env, source_repo, capsys):
     assert "nested-skill" in output
 
 
-def test_sync_path_not_found_in_repo(env, source_repo, capsys):
+def test_sync_path_not_found_in_repo(
+    env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     yaml_file = env.home / ".claude" / "skillset.yaml"
     yaml_file.write_text("skills:\n  owner/repo:\n    path: nonexistent\n")
 
@@ -334,7 +362,9 @@ def test_sync_path_not_found_in_repo(env, source_repo, capsys):
     assert "Path not found in repo" in output
 
 
-def test_sync_editable_path_not_found(env, source_repo, capsys):
+def test_sync_editable_path_not_found(
+    env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     yaml_file = env.home / ".claude" / "skillset.yaml"
     yaml_file.write_text(
         "skills:\n"
@@ -349,7 +379,9 @@ def test_sync_editable_path_not_found(env, source_repo, capsys):
     assert "Path not found" in output
 
 
-def test_sync_with_file_arg(env, source_repo, capsys):
+def test_sync_with_file_arg(
+    env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     """Explicit file argument to cmd_update."""
     yaml_file = env.tmp / "custom.yaml"
     yaml_file.write_text(f"skills:\n  {source_repo}:\n    enabled: ['*']\n")
@@ -361,7 +393,7 @@ def test_sync_with_file_arg(env, source_repo, capsys):
     assert "Updating" in output
 
 
-def test_sync_global_flag(env, source_repo, capsys):
+def test_sync_global_flag(env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """cmd_update(g=True) uses global skillset.yaml."""
     yaml_file = env.home / ".claude" / "skillset.yaml"
     yaml_file.write_text(f"skills:\n  {source_repo}:\n    enabled: ['*']\n")
@@ -373,7 +405,9 @@ def test_sync_global_flag(env, source_repo, capsys):
     assert "Updating" in output
 
 
-def test_sync_local_scope(env, source_repo, capsys, monkeypatch):
+def test_sync_local_scope(
+    env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Sync with local skillset.yaml found via find_skillset_root."""
     monkeypatch.setattr("skillset.commands.update.find_skillset_root", lambda: env.project)
     yaml_file = env.project / "skillset.yaml"
@@ -390,7 +424,9 @@ def test_sync_local_scope(env, source_repo, capsys, monkeypatch):
     assert "Updating" in output
 
 
-def test_sync_editable_relative_source_from_local_yaml_dir(env, capsys, monkeypatch):
+def test_sync_editable_relative_source_from_local_yaml_dir(
+    env: Env, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Relative editable `source` resolves against the yaml's dir, not the CWD."""
     monkeypatch.setattr("skillset.commands.update.find_skillset_root", lambda: env.project)
     sibling = env.project.parent / "bt-docs"
@@ -413,7 +449,9 @@ def test_sync_editable_relative_source_from_local_yaml_dir(env, capsys, monkeypa
     assert (env.project / ".claude" / "skills" / "some-skill").is_symlink()
 
 
-def test_sync_local_file_not_found(env, capsys, monkeypatch):
+def test_sync_local_file_not_found(
+    env: Env, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Local sync file not found shows local hint."""
     monkeypatch.setattr("skillset.commands.update.find_skillset_root", lambda: env.project)
 
@@ -424,7 +462,7 @@ def test_sync_local_file_not_found(env, capsys, monkeypatch):
     assert "Run 'skillset init' to create one." in output
 
 
-def test_sync_dict_invalid_repo_spec(env, capsys):
+def test_sync_dict_invalid_repo_spec(env: Env, capsys: pytest.CaptureFixture[str]) -> None:
     """Dict entry with invalid repo spec in non-editable mode."""
     yaml_file = env.home / ".claude" / "skillset.yaml"
     yaml_file.write_text("skills:\n  invalid:\n    copy: true\n")
@@ -434,7 +472,7 @@ def test_sync_dict_invalid_repo_spec(env, capsys):
     assert "Invalid repo format" in output
 
 
-def test_links_section(env, capsys):
+def test_links_section(env: Env, capsys: pytest.CaptureFixture[str]) -> None:
     yaml_file = env.home / ".claude" / "skillset.yaml"
     target = env.tmp / "target_file"
     target.write_text("content")
@@ -450,7 +488,7 @@ def test_links_section(env, capsys):
     assert "Linked" in output
 
 
-def test_links_existing_symlink(env, capsys):
+def test_links_existing_symlink(env: Env, capsys: pytest.CaptureFixture[str]) -> None:
     yaml_file = env.home / ".claude" / "skillset.yaml"
     target = env.tmp / "target"
     target.write_text("x")
@@ -467,7 +505,7 @@ def test_links_existing_symlink(env, capsys):
     assert "already exists" in output
 
 
-def test_links_existing_file_skipped(env, capsys):
+def test_links_existing_file_skipped(env: Env, capsys: pytest.CaptureFixture[str]) -> None:
     yaml_file = env.home / ".claude" / "skillset.yaml"
     target = env.tmp / "target"
     target.write_text("x")
@@ -484,7 +522,7 @@ def test_links_existing_file_skipped(env, capsys):
     assert "Skipping" in output
 
 
-def test_snapshot_entry_skipped(env, capsys):
+def test_snapshot_entry_skipped(env: Env, capsys: pytest.CaptureFixture[str]) -> None:
     """Entries with snapshot: true must not be cloned, pulled, or relinked."""
     yaml_file = env.home / ".claude" / "skillset.yaml"
     yaml_file.write_text(

@@ -6,11 +6,12 @@ import pytest
 
 from skillset.discovery import find_skills
 from skillset.repo import get_repo_dir
+from tests.support import Env
 
 REPO = "vivainio/agent-skills"
 
 
-def repo_skills(subpath=None):
+def repo_skills(subpath: str | None = None) -> set[str]:
     """Return skill names currently discovered in the cloned integration repo."""
     source = get_repo_dir("vivainio", "agent-skills")
     if subpath:
@@ -18,7 +19,7 @@ def repo_skills(subpath=None):
     return {skill.name for skill in find_skills(source)}
 
 
-def skills_outside(subpath):
+def skills_outside(subpath: str) -> set[str]:
     """Return root-repo skills not contained in subpath."""
     source = get_repo_dir("vivainio", "agent-skills")
     excluded_root = source / subpath
@@ -26,7 +27,7 @@ def skills_outside(subpath):
 
 
 @pytest.fixture
-def env(tmp_path, monkeypatch):
+def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Env:
     """Isolated environment with redirected home and project dirs."""
     home = tmp_path / "home"
     project = tmp_path / "project"
@@ -46,4 +47,4 @@ def env(tmp_path, monkeypatch):
     (home / ".claude").mkdir(parents=True)
     (home / ".cache" / "skillset" / "repos").mkdir(parents=True)
 
-    return type("Env", (), {"home": home, "project": project, "tmp": tmp_path})()
+    return Env(home=home, project=project, tmp=tmp_path)

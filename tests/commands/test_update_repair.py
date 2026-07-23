@@ -1,7 +1,10 @@
 """Tests for duplicate cached/editable repository repair."""
 
 import subprocess
+from pathlib import Path
 from unittest.mock import patch
+
+import pytest
 
 from skillset.commands.update_repair import (
     remove_redundant_cached_repos,
@@ -10,20 +13,22 @@ from skillset.commands.update_repair import (
 from skillset.paths import load_skillset
 
 
-def _git_repo(path, remote):
+def _git_repo(path: Path, remote: str) -> Path:
     path.mkdir()
     subprocess.run(["git", "init", "-q"], cwd=path, check=True)
     subprocess.run(["git", "remote", "add", "origin", remote], cwd=path, check=True)
     return path
 
 
-def _skill(root, name):
+def _skill(root: Path, name: str) -> None:
     path = root / "skills" / name
     path.mkdir(parents=True)
     (path / "SKILL.md").write_text(f"# {name}\n")
 
 
-def test_reports_cached_and_editable_duplicate(tmp_path, capsys):
+def test_reports_cached_and_editable_duplicate(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     checkout = _git_repo(tmp_path / "checkout", "git@github.com:owner/repo.git")
     config_path = tmp_path / "skillset.yaml"
     config = {
@@ -41,7 +46,7 @@ def test_reports_cached_and_editable_duplicate(tmp_path, capsys):
     assert "skillset update --repair" in output
 
 
-def test_repair_consolidates_enabled_union_under_repo_key(tmp_path):
+def test_repair_consolidates_enabled_union_under_repo_key(tmp_path: Path) -> None:
     checkout = _git_repo(tmp_path / "checkout", "https://github.com/owner/repo.git")
     _skill(checkout, "one")
     _skill(checkout, "two")
@@ -67,7 +72,9 @@ def test_repair_consolidates_enabled_union_under_repo_key(tmp_path):
     assert repaired["owner/repo"]["enabled"] == ["one", "two"]
 
 
-def test_repair_refuses_conflicting_copy_modes(tmp_path, capsys):
+def test_repair_refuses_conflicting_copy_modes(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     checkout = _git_repo(tmp_path / "checkout", "git@github.com:owner/repo.git")
     config_path = tmp_path / "skillset.yaml"
     config = {
@@ -84,7 +91,9 @@ def test_repair_refuses_conflicting_copy_modes(tmp_path, capsys):
     assert not config_path.exists()
 
 
-def test_repair_removes_missing_editable_source(tmp_path, capsys):
+def test_repair_removes_missing_editable_source(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     config_path = tmp_path / "skillset.yaml"
     config = {
         "skills": {
@@ -108,7 +117,9 @@ def test_repair_removes_missing_editable_source(tmp_path, capsys):
     assert "Removed missing: source not found" in capsys.readouterr().out
 
 
-def test_repair_records_cache_candidate_only_after_safe_consolidation(home_dir, tmp_path):
+def test_repair_records_cache_candidate_only_after_safe_consolidation(
+    home_dir: Path, tmp_path: Path
+) -> None:
     checkout = _git_repo(tmp_path / "checkout", "git@github.com:owner/repo.git")
     (home_dir / ".cache" / "skillset" / "repos" / "owner" / "repo").mkdir(parents=True)
     config_path = tmp_path / "skillset.yaml"
@@ -127,7 +138,7 @@ def test_repair_records_cache_candidate_only_after_safe_consolidation(home_dir, 
     assert candidates == [("owner/repo", checkout)]
 
 
-def test_repair_finds_cache_for_editable_only_entry(home_dir, tmp_path):
+def test_repair_finds_cache_for_editable_only_entry(home_dir: Path, tmp_path: Path) -> None:
     checkout = _git_repo(tmp_path / "checkout", "git@github.com:owner/repo.git")
     (home_dir / ".cache" / "skillset" / "repos" / "owner" / "repo").mkdir(parents=True)
     config_path = tmp_path / "skillset.yaml"
@@ -150,7 +161,9 @@ def test_repair_finds_cache_for_editable_only_entry(home_dir, tmp_path):
     assert candidates == [("owner/repo", checkout)]
 
 
-def test_repair_deduplicates_cache_candidates_for_editable_aliases(home_dir, tmp_path):
+def test_repair_deduplicates_cache_candidates_for_editable_aliases(
+    home_dir: Path, tmp_path: Path
+) -> None:
     checkout = _git_repo(tmp_path / "checkout", "git@github.com:owner/repo.git")
     (home_dir / ".cache" / "skillset" / "repos" / "owner" / "repo").mkdir(parents=True)
     config_path = tmp_path / "skillset.yaml"
@@ -169,7 +182,9 @@ def test_repair_deduplicates_cache_candidates_for_editable_aliases(home_dir, tmp
     assert candidates == [("owner/repo", checkout)]
 
 
-def test_removes_redundant_cache_when_confirmed(home_dir, tmp_path, capsys):
+def test_removes_redundant_cache_when_confirmed(
+    home_dir: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     cache = home_dir / ".cache" / "skillset" / "repos" / "owner" / "repo"
     cache.mkdir(parents=True)
     (cache / "file").write_text("cached")
@@ -182,7 +197,9 @@ def test_removes_redundant_cache_when_confirmed(home_dir, tmp_path, capsys):
     assert "Removed cached clone" in capsys.readouterr().out
 
 
-def test_keeps_redundant_cache_when_declined(home_dir, tmp_path, capsys):
+def test_keeps_redundant_cache_when_declined(
+    home_dir: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     cache = home_dir / ".cache" / "skillset" / "repos" / "owner" / "repo"
     cache.mkdir(parents=True)
 
@@ -193,7 +210,7 @@ def test_keeps_redundant_cache_when_declined(home_dir, tmp_path, capsys):
     assert "Kept cached clone" in capsys.readouterr().out
 
 
-def test_yes_removes_without_prompt(home_dir, tmp_path):
+def test_yes_removes_without_prompt(home_dir: Path, tmp_path: Path) -> None:
     cache = home_dir / ".cache" / "skillset" / "repos" / "owner" / "repo"
     cache.mkdir(parents=True)
 
@@ -204,7 +221,9 @@ def test_yes_removes_without_prompt(home_dir, tmp_path):
     assert not cache.exists()
 
 
-def test_no_reports_cache_without_prompt(home_dir, tmp_path, capsys):
+def test_no_reports_cache_without_prompt(
+    home_dir: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     cache = home_dir / ".cache" / "skillset" / "repos" / "owner" / "repo"
     cache.mkdir(parents=True)
 

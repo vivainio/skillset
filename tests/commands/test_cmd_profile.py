@@ -2,10 +2,12 @@
 
 from unittest.mock import patch
 
+import pytest
+
 from skillset.commands.profile import cmd_profile
 
 
-def test_name_switches_directly(capsys):
+def test_name_switches_directly(capsys: pytest.CaptureFixture[str]) -> None:
     with patch("skillset.commands.profile.activate_profile", return_value=(3, 2)) as activate:
         cmd_profile("work")
 
@@ -13,7 +15,7 @@ def test_name_switches_directly(capsys):
     assert "Activated profile 'work'" in capsys.readouterr().out
 
 
-def test_menu_can_save(monkeypatch):
+def test_menu_can_save(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("builtins.input", lambda _prompt: "work")
     with (
         patch("skillset.commands.profile.profile_names", return_value=[]),
@@ -27,7 +29,7 @@ def test_menu_can_save(monkeypatch):
     save.assert_called_once_with("work", include_unmanaged=False)
 
 
-def test_save_can_include_unmanaged(monkeypatch):
+def test_save_can_include_unmanaged(monkeypatch: pytest.MonkeyPatch) -> None:
     answers = iter(["work", "yes"])
     monkeypatch.setattr("builtins.input", lambda _prompt: next(answers))
     with (

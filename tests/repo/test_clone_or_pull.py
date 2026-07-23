@@ -1,12 +1,15 @@
 """Tests for skillset.repo.clone_or_pull."""
 
 import subprocess
+from pathlib import Path
 from unittest.mock import patch
+
+import pytest
 
 from skillset.repo import clone_or_pull
 
 
-def test_clones_new_repo(home_dir, monkeypatch):
+def test_clones_new_repo(home_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("XDG_DATA_HOME", raising=False)
     with patch("skillset.repo.subprocess.run") as mock_run:
         mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
@@ -21,7 +24,7 @@ def test_clones_new_repo(home_dir, monkeypatch):
     assert "https://github.com/owner/repo.git" in args
 
 
-def test_pulls_existing_repo(home_dir):
+def test_pulls_existing_repo(home_dir: Path) -> None:
     repo_dir = home_dir / ".cache" / "skillset" / "repos" / "owner" / "repo"
     repo_dir.mkdir(parents=True)
 
@@ -34,7 +37,7 @@ def test_pulls_existing_repo(home_dir):
     assert args == ["git", "pull"]
 
 
-def test_pull_failure_warns(home_dir, capsys):
+def test_pull_failure_warns(home_dir: Path, capsys: pytest.CaptureFixture[str]) -> None:
     repo_dir = home_dir / ".cache" / "skillset" / "repos" / "owner" / "repo"
     repo_dir.mkdir(parents=True)
 
@@ -49,7 +52,7 @@ def test_pull_failure_warns(home_dir, capsys):
     assert "Warning" in output
 
 
-def test_clone_ssh_fallback(home_dir, monkeypatch):
+def test_clone_ssh_fallback(home_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("XDG_DATA_HOME", raising=False)
     with patch("skillset.repo.subprocess.run") as mock_run:
         # First call (HTTPS) fails with auth error, second (SSH) succeeds
@@ -67,7 +70,7 @@ def test_clone_ssh_fallback(home_dir, monkeypatch):
     assert "git@github.com:owner/repo.git" in ssh_args
 
 
-def test_clone_non_auth_error_raises(home_dir):
+def test_clone_non_auth_error_raises(home_dir: Path) -> None:
     import pytest
 
     with patch("skillset.repo.subprocess.run") as mock_run:

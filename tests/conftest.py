@@ -6,21 +6,21 @@ import pytest
 
 
 @pytest.fixture
-def home_dir(tmp_path, monkeypatch):
+def home_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Redirect Path.home() to a temp directory."""
     monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
     return tmp_path
 
 
 @pytest.fixture
-def git_root(tmp_path, monkeypatch):
+def git_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Fake git repo root — patches get_git_root to return tmp_path."""
     monkeypatch.setattr("skillset.paths.get_git_root", lambda: tmp_path)
     return tmp_path
 
 
 @pytest.fixture
-def skill_repo(tmp_path):
+def skill_repo(tmp_path: Path) -> Path:
     """Create a fake repo with skill-a, skill-b, and a command."""
     repo = tmp_path / "repo"
     for name in ("skill-a", "skill-b"):

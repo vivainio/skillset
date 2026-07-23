@@ -1,11 +1,13 @@
 """Tests for skillset.linking.remove_managed."""
 
+from pathlib import Path
+
 import pytest
 
 from skillset.linking import SKILLSET_SOURCE_MARKER, remove_managed
 
 
-def test_removes_managed_copy(tmp_path):
+def test_removes_managed_copy(tmp_path: Path) -> None:
     d = tmp_path / "skill"
     d.mkdir()
     (d / SKILLSET_SOURCE_MARKER).write_text("x\n")
@@ -15,7 +17,7 @@ def test_removes_managed_copy(tmp_path):
     assert not d.exists()
 
 
-def test_removes_symlink(tmp_path):
+def test_removes_symlink(tmp_path: Path) -> None:
     target = tmp_path / "target"
     target.mkdir()
     link = tmp_path / "link"
@@ -26,7 +28,7 @@ def test_removes_symlink(tmp_path):
     assert target.exists()
 
 
-def test_raises_for_unmanaged_path(tmp_path):
+def test_raises_for_unmanaged_path(tmp_path: Path) -> None:
     d = tmp_path / "regular"
     d.mkdir()
 

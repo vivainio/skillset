@@ -1,9 +1,14 @@
 """Tests for skillset.commands.cmd_install_skills."""
 
+from pathlib import Path
+
+import pytest
+
 from skillset.commands import cmd_install_skills
+from tests.support import Env
 
 
-def test_install_skills_copies_bundled_skill(env, capsys):
+def test_install_skills_copies_bundled_skill(env: Env, capsys: pytest.CaptureFixture[str]) -> None:
     cmd_install_skills()
 
     skill_dir = env.home / ".claude" / "skills" / "skillset"
@@ -13,7 +18,9 @@ def test_install_skills_copies_bundled_skill(env, capsys):
     assert "Installed skillset skill" in output
 
 
-def test_install_skills_is_global_inside_configured_project(env, capsys, monkeypatch):
+def test_install_skills_is_global_inside_configured_project(
+    env: Env, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
     (env.project / "skillset.yaml").write_text("skills: {}\n")
     monkeypatch.chdir(env.project)
 
@@ -25,7 +32,7 @@ def test_install_skills_is_global_inside_configured_project(env, capsys, monkeyp
     assert not project_skill.exists()
 
 
-def test_install_skills_is_idempotent(env, capsys):
+def test_install_skills_is_idempotent(env: Env, capsys: pytest.CaptureFixture[str]) -> None:
     cmd_install_skills()
     capsys.readouterr()
     cmd_install_skills()
@@ -36,7 +43,9 @@ def test_install_skills_is_idempotent(env, capsys):
     assert (skill_dir / "SKILL.md").is_file()
 
 
-def test_install_skills_clobbers_existing_unmanaged_dir(env, capsys):
+def test_install_skills_clobbers_existing_unmanaged_dir(
+    env: Env, capsys: pytest.CaptureFixture[str]
+) -> None:
     skills_dir = env.home / ".claude" / "skills"
     skills_dir.mkdir(parents=True)
     manual = skills_dir / "skillset"
@@ -52,7 +61,9 @@ def test_install_skills_clobbers_existing_unmanaged_dir(env, capsys):
     assert not (manual / "custom-file.txt").exists()
 
 
-def test_install_skills_clobbers_existing_symlink(env, capsys, tmp_path):
+def test_install_skills_clobbers_existing_symlink(
+    env: Env, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
     skills_dir = env.home / ".claude" / "skills"
     skills_dir.mkdir(parents=True)
     elsewhere = tmp_path / "elsewhere"

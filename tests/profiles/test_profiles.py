@@ -1,5 +1,7 @@
 """Tests for saving and activating global skill profiles."""
 
+from pathlib import Path
+
 from skillset.linking import copy_dir, create_dir_link
 from skillset.paths import get_global_skills_dir, get_profile_store_dir
 from skillset.profiles import (
@@ -11,13 +13,13 @@ from skillset.profiles import (
 )
 
 
-def _skill(path):
+def _skill(path: Path) -> Path:
     path.mkdir(parents=True)
     (path / "SKILL.md").write_text(f"# {path.name}\n")
     return path
 
 
-def test_save_and_switch_managed_skills(home_dir, tmp_path):
+def test_save_and_switch_managed_skills(home_dir: Path, tmp_path: Path) -> None:
     sources = tmp_path / "sources"
     alpha = _skill(sources / "alpha")
     beta = _skill(sources / "beta")
@@ -38,7 +40,7 @@ def test_save_and_switch_managed_skills(home_dir, tmp_path):
     assert active_profile() == "minimal"
 
 
-def test_save_leaves_unmanaged_skill_alone_by_default(home_dir):
+def test_save_leaves_unmanaged_skill_alone_by_default(home_dir: Path) -> None:
     unmanaged = _skill(get_global_skills_dir() / "personal")
 
     count, skipped = save_profile("work")
@@ -49,7 +51,7 @@ def test_save_leaves_unmanaged_skill_alone_by_default(home_dir):
     assert not unmanaged.is_symlink()
 
 
-def test_save_can_adopt_unmanaged_skill(home_dir):
+def test_save_can_adopt_unmanaged_skill(home_dir: Path) -> None:
     original = _skill(get_global_skills_dir() / "personal")
 
     count, skipped = save_profile("work", include_unmanaged=True)
@@ -61,7 +63,7 @@ def test_save_can_adopt_unmanaged_skill(home_dir):
     assert (stored / "SKILL.md").is_file()
 
 
-def test_save_stores_managed_copy_so_it_can_be_reactivated(home_dir, tmp_path):
+def test_save_stores_managed_copy_so_it_can_be_reactivated(home_dir: Path, tmp_path: Path) -> None:
     source = _skill(tmp_path / "source")
     installed = get_global_skills_dir()
     installed.mkdir(parents=True)
@@ -74,7 +76,7 @@ def test_save_stores_managed_copy_so_it_can_be_reactivated(home_dir, tmp_path):
     assert (installed / "snapshot").resolve() == stored
 
 
-def test_switch_does_not_touch_unrelated_unmanaged_skill(home_dir, tmp_path):
+def test_switch_does_not_touch_unrelated_unmanaged_skill(home_dir: Path, tmp_path: Path) -> None:
     source = _skill(tmp_path / "managed")
     installed = get_global_skills_dir()
     installed.mkdir(parents=True)
@@ -89,7 +91,7 @@ def test_switch_does_not_touch_unrelated_unmanaged_skill(home_dir, tmp_path):
     assert not personal.is_symlink()
 
 
-def test_delete_keeps_stored_skill(home_dir):
+def test_delete_keeps_stored_skill(home_dir: Path) -> None:
     _skill(get_global_skills_dir() / "personal")
     save_profile("work", include_unmanaged=True)
     stored = get_profile_store_dir() / "personal"

@@ -1,9 +1,11 @@
 """Tests for skillset.ui.register_local_lib."""
 
+from pathlib import Path
+
 from skillset.ui import register_local_lib
 
 
-def test_creates_symlink_in_cache(home_dir, tmp_path):
+def test_creates_symlink_in_cache(home_dir: Path, tmp_path: Path) -> None:
     source = tmp_path / "my-skills"
     source.mkdir()
 
@@ -14,7 +16,7 @@ def test_creates_symlink_in_cache(home_dir, tmp_path):
     assert link.resolve() == source.resolve()
 
 
-def test_replaces_existing_link(home_dir, tmp_path):
+def test_replaces_existing_link(home_dir: Path, tmp_path: Path) -> None:
     source1 = tmp_path / "v1"
     source1.mkdir()
     source2 = tmp_path / "v2"
@@ -31,7 +33,7 @@ def test_replaces_existing_link(home_dir, tmp_path):
     assert link.resolve() == source1.resolve()
 
 
-def test_skips_non_link_existing(home_dir, tmp_path):
+def test_skips_non_link_existing(home_dir: Path, tmp_path: Path) -> None:
     source = tmp_path / "skills"
     source.mkdir()
 

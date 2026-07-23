@@ -1,15 +1,17 @@
 """Tests for skillset.discovery.find_commands."""
 
+from pathlib import Path
+
 from skillset.discovery import find_commands
 
 
-def test_finds_command_files(skill_repo):
+def test_finds_command_files(skill_repo: Path) -> None:
     commands = find_commands(skill_repo)
     names = [c.name for c in commands]
     assert "do-thing.md" in names
 
 
-def test_finds_nested_commands(tmp_path):
+def test_finds_nested_commands(tmp_path: Path) -> None:
     nested = tmp_path / "commands" / "sub"
     nested.mkdir(parents=True)
     (nested / "nested-cmd.md").write_text("# cmd\n")
@@ -21,7 +23,7 @@ def test_finds_nested_commands(tmp_path):
     assert "top-cmd.md" in names
 
 
-def test_excludes_hidden_directories(tmp_path):
+def test_excludes_hidden_directories(tmp_path: Path) -> None:
     hidden = tmp_path / ".hidden" / "commands"
     hidden.mkdir(parents=True)
     (hidden / "secret-cmd.md").write_text("# secret\n")
@@ -37,5 +39,5 @@ def test_excludes_hidden_directories(tmp_path):
     assert "visible-cmd.md" in names
 
 
-def test_returns_empty_for_no_commands(tmp_path):
+def test_returns_empty_for_no_commands(tmp_path: Path) -> None:
     assert find_commands(tmp_path) == []
