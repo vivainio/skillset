@@ -54,6 +54,39 @@ def test_sync_glob_pattern_matches(
     assert "+ skill-b" in output
 
 
+def test_sync_agent_glob_pattern(env: Env, source_repo: Path) -> None:
+    agents = source_repo / "agents"
+    agents.mkdir()
+    for name in ("review-code", "review-security", "tester"):
+        (agents / f"{name}.md").write_text(f"# {name}\n")
+    yaml_file = env.home / ".claude" / "skillset.yaml"
+    yaml_file.write_text("skills:\n  owner/repo:\n    enabled: ['*']\n    agents: ['review-*']\n")
+
+    with patch("skillset.commands.update.clone_or_pull", return_value=source_repo):
+        cmd_update()
+
+    target = env.home / ".claude" / "agents"
+    assert (target / "review-code.md").is_symlink()
+    assert (target / "review-security.md").is_symlink()
+    assert not (target / "tester.md").exists()
+
+
+def test_sync_empty_agent_list_removes_managed_agents(env: Env, source_repo: Path) -> None:
+    agents = source_repo / "agents"
+    agents.mkdir()
+    (agents / "reviewer.md").write_text("# reviewer\n")
+    target = env.home / ".claude" / "agents"
+    target.mkdir()
+    (target / "reviewer.md").symlink_to(agents / "reviewer.md")
+    yaml_file = env.home / ".claude" / "skillset.yaml"
+    yaml_file.write_text("skills:\n  owner/repo:\n    enabled: ['*']\n    agents: []\n")
+
+    with patch("skillset.commands.update.clone_or_pull", return_value=source_repo):
+        cmd_update()
+
+    assert not (target / "reviewer.md").exists()
+
+
 def test_sync_glob_with_disabled_subtraction(
     env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

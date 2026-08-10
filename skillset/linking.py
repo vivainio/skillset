@@ -7,7 +7,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from skillset.discovery import find_commands, find_skills
+from skillset.discovery import find_agents, find_commands, find_skills
 from skillset.paths import IS_WINDOWS
 
 SKILLSET_SOURCE_MARKER = ".skillset-source"
@@ -210,3 +210,63 @@ def link_commands(
             link_path.symlink_to(cmd_file)
         linked.append(cmd_name)
     return linked
+
+
+def link_agents(
+    repo_dir: Path,
+    target_dir: Path,
+    only: set[str] | None = None,
+    copy: bool = False,
+) -> list[str]:
+    """Link or copy Claude agents, preserving paths below each agents root."""
+    discovered = find_agents(repo_dir)
+    relative_paths = [relative for _, relative in discovered]
+    duplicates = {path for path in relative_paths if relative_paths.count(path) > 1}
+    if duplicates:
+        names = ", ".join(sorted(path.as_posix() for path in duplicates))
+        print(f"  Skipping conflicting agent path(s): {names}")
+
+    linked = []
+    for agent_file, relative in discovered:
+        if relative in duplicates:
+            continue
+        agent_name = relative.with_suffix("").as_posix()
+        if only is not None and agent_name not in only:
+            continue
+        link_path = target_dir / relative
+        link_path.parent.mkdir(parents=True, exist_ok=True)
+        if link_path.is_symlink():
+            link_path.unlink()
+        elif link_path.exists():
+            if copy:
+                link_path.unlink()
+            else:
+                print(f"  Skipping {relative.as_posix()}: already exists (not a link)")
+                continue
+        if copy:
+            shutil.copy2(agent_file, link_path)
+        else:
+            link_path.symlink_to(agent_file)
+        linked.append(agent_name)
+    return linked
+
+
+def remove_unselected_agents(repo_dir: Path, target_dir: Path, keep: set[str]) -> None:
+    """Remove linked agents sourced from repo_dir unless their names are kept."""
+    if not target_dir.exists():
+        return
+    source = repo_dir.resolve()
+    for item in sorted(target_dir.rglob("*.md")):
+        name = item.relative_to(target_dir).with_suffix("").as_posix()
+        if name in keep or not item.is_symlink():
+            continue
+        try:
+            item.resolve().relative_to(source)
+        except ValueError:
+            continue
+        item.unlink()
+    for directory in sorted(
+        (path for path in target_dir.rglob("*") if path.is_dir()), reverse=True
+    ):
+        if not any(directory.iterdir()):
+            directory.rmdir()

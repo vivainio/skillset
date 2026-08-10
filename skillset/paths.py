@@ -126,10 +126,21 @@ def get_global_commands_dir() -> Path:
     return Path.home() / ".claude" / "commands"
 
 
+def get_global_agents_dir() -> Path:
+    """Get global Claude agents directory."""
+    return Path.home() / ".claude" / "agents"
+
+
 def get_project_commands_dir() -> Path | None:
     """Get project-local Claude commands directory, or None if not in a git repo."""
     root = get_git_root()
     return root / ".claude" / "commands" if root else None
+
+
+def get_project_agents_dir() -> Path | None:
+    """Get project-local Claude agents directory, or None if not in a git repo."""
+    root = get_git_root()
+    return root / ".claude" / "agents" if root else None
 
 
 def get_global_skillset_path() -> Path:
@@ -194,6 +205,7 @@ def add_to_skillset(  # noqa: C901
     path: str | None = None,
     enabled: list[str] | None = None,
     disabled: list[str] | None = None,
+    agents: list[str] | None = None,
     editable: bool = False,
     source: str | None = None,
     ref: str | None = None,
@@ -232,6 +244,8 @@ def add_to_skillset(  # noqa: C901
         entry["enabled"] = _flow_list(enabled)
     if disabled:
         entry["disabled"] = _flow_list(disabled)
+    if agents is not None:
+        entry["agents"] = _flow_list(agents)
 
     skills[repo_key] = entry
     save_skillset(config_path, data)
@@ -307,6 +321,22 @@ def update_skillset_skills(
     if modified:
         save_skillset(config_path, data)
     return modified
+
+
+def set_skillset_agents(config_path: Path, repo_key: str, agents: list[str]) -> bool:
+    """Replace an existing entry's flat agent selector list."""
+    if not config_path.exists():
+        return False
+    data = load_skillset(config_path)
+    entry = (data.get("skills") or {}).get(repo_key)
+    if not isinstance(entry, dict):
+        return False
+    replacement = _flow_list(agents)
+    if entry.get("agents") == replacement:
+        return False
+    entry["agents"] = replacement
+    save_skillset(config_path, data)
+    return True
 
 
 def set_skillset_ref(config_path: Path, repo_key: str, ref: str | None) -> bool:

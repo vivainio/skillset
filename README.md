@@ -1,6 +1,6 @@
 # skillset
 
-Manage AI skills across projects for Claude Code.
+Manage AI skills, commands, and agents across projects for Claude Code.
 
 ## Install
 
@@ -42,8 +42,32 @@ skillset add vivainio/agent-skills                    # all skills from repo
 skillset add vivainio/agent-skills -g                 # force global install even if local skillset.yaml file is found
 skillset add vivainio/agent-skills -s zaira           # only the zaira skill
 skillset add vivainio/agent-skills -s zaira -s other  # multiple specific skills
-skillset add vivainio/agent-skills -p extra-skills    # skills from extra-skills/ subdirectory only
+skillset add vivainio/agent-skills -p extra-skills    # discover only within this subtree
+skillset add owner/repo -a reviewer -a test-%         # select agents by name/glob
+skillset add owner/repo -p package/agents -a review-% # -p may be an agents directory
 ```
+
+Agent definitions are installed alongside skills and commands. Markdown files
+below any `agents/` directory are linked to `.claude/agents/` (or
+`~/.claude/agents/` globally), preserving paths below the `agents/` directory.
+The `-p` option limits discovery of skills, commands, and agents to that subtree;
+it may also point directly at an `agents/` directory. Canonical
+`.claude/agents/` source directories are supported.
+
+Agent selectors use install-relative names without `.md`; for example,
+`agents/review/security.md` is selected as `review/security`. `%` is the
+shell-safe alias for `*`. Selections persist independently from skills:
+
+```yaml
+skills:
+  owner/repo:
+    enabled: ["*"]
+    agents: ["review-*"]
+```
+
+With no `agents` key, all discovered agents are installed. `agents: []`
+installs none. Explicit selectors are replacement-based: running `add -a ...`
+again replaces that source's previous agent selection.
 
 You can also pass a full GitHub URL:
 
@@ -52,14 +76,15 @@ skillset add https://github.com/vivainio/agent-skills
 skillset add https://github.com/vivainio/agent-skills/tree/main/extra-skills
 ```
 
-### Fetch a repo without linking any skills
+### Fetch a repo without linking artifacts
 
 ```bash
 skillset add vivainio/agent-skills --fetch
 ```
 
 `--fetch` clones/caches the repo and registers it in `skillset.yaml` with
-`enabled: []` (its current skills go into `disabled`), but links nothing.
+`enabled: []` (its current skills go into `disabled`) and `agents: []`, but
+links nothing.
 Useful for pulling a repo into the local cache -- e.g. to search or browse
 its skills later -- without installing any of them yet. A later
 `skillset update` will only prompt about skills added upstream after the

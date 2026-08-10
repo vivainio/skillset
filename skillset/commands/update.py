@@ -12,22 +12,25 @@ from skillset.commands.update_repair import (
     remove_redundant_cached_repos,
     report_or_repair_duplicate_sources,
 )
-from skillset.discovery import find_skills
+from skillset.discovery import find_agents, find_skills
 from skillset.linking import (
     get_copy_source,
     has_glob,
     is_managed,
     is_managed_copy,
+    link_agents,
     link_commands,
     link_skills,
     normalize_glob,
     remove_managed,
+    remove_unselected_agents,
 )
 from skillset.manifest import record_install
 from skillset.paths import (
     SKILLSET_CONFIG_FILE,
     abbrev,
     find_skillset_root,
+    get_global_agents_dir,
     get_global_commands_dir,
     get_global_skills_dir,
     get_global_skillset_path,
@@ -103,7 +106,7 @@ def cmd_update(
         print("No skills entries in skillset.yaml")
         return
 
-    skills_dir, commands_dir = _update_dirs(is_local, file_path)
+    skills_dir, commands_dir, agents_dir = _update_dirs(is_local, file_path)
     scope = "local" if is_local else "global"
     unmanaged_names = set(config.get("unmanaged") or [])
     total_linked = 0
@@ -119,6 +122,7 @@ def cmd_update(
                 value,
                 skills_dir,
                 commands_dir,
+                agents_dir,
                 scope,
                 new_skills_found,
                 new_skills_ctx,
@@ -196,12 +200,16 @@ def _apply_links(links_config: dict[str, str]) -> None:
             print(f"  Warning: {local_path} is not in .gitignore")
 
 
-def _update_dirs(is_local: bool, file_path: Path) -> tuple[Path, Path]:
-    """Return (skills_dir, commands_dir) for update."""
+def _update_dirs(is_local: bool, file_path: Path) -> tuple[Path, Path, Path]:
+    """Return target directories for update."""
     if not is_local:
-        return get_global_skills_dir(), get_global_commands_dir()
+        return get_global_skills_dir(), get_global_commands_dir(), get_global_agents_dir()
     root = file_path.parent
-    return root / ".claude" / "skills", root / ".claude" / "commands"
+    return (
+        root / ".claude" / "skills",
+        root / ".claude" / "commands",
+        root / ".claude" / "agents",
+    )
 
 
 def _update_entry(
@@ -209,6 +217,7 @@ def _update_entry(
     value: object,
     skills_dir: Path,
     commands_dir: Path,
+    agents_dir: Path,
     scope: str,
     new_found: NewSkills,
     new_ctx: NewSkillContexts,
@@ -225,6 +234,7 @@ def _update_entry(
         value,
         skills_dir,
         commands_dir,
+        agents_dir,
         scope,
         new_found,
         new_ctx,
@@ -239,6 +249,7 @@ def _update_dict_entry(
     value: dict,
     skills_dir: Path,
     commands_dir: Path,
+    agents_dir: Path,
     scope: str,
     new_found: NewSkills,
     new_ctx: NewSkillContexts,
@@ -260,12 +271,16 @@ def _update_dict_entry(
     use_copy = value.get("copy", False)
     enabled_raw = value.get("enabled")
     disabled_raw = value.get("disabled", [])
+    agents_raw = value.get("agents")
 
     if enabled_raw is not None and not isinstance(enabled_raw, list):
         print(f"\nSkipping {repo_key}: 'enabled' must be a list")
         return 0
     if not isinstance(disabled_raw, list):
         print(f"\nSkipping {repo_key}: 'disabled' must be a list")
+        return 0
+    if agents_raw is not None and not isinstance(agents_raw, list):
+        print(f"\nSkipping {repo_key}: 'agents' must be a list")
         return 0
 
     source_dir, repo_dir, owner, repo_name, updated = _resolve_update_source(
@@ -295,6 +310,8 @@ def _update_dict_entry(
         literals = {p for p in (enabled_raw + disabled_raw) if not has_glob(p)}
         tracked = enabled_expanded | disabled_set | literals
 
+    enabled_agents = _enabled_agents(source_dir, agents_raw)
+
     total = _update_lists(
         enabled_declared,
         disabled_set,
@@ -303,6 +320,8 @@ def _update_dict_entry(
         source_dir,
         skills_dir,
         commands_dir,
+        agents_dir,
+        enabled_agents,
         use_copy,
         repo_key,
         new_found,
@@ -320,6 +339,14 @@ def _update_dict_entry(
             scope=scope,
         )
     return total
+
+
+def _enabled_agents(source_dir: Path, agents_raw: list[str] | None) -> set[str]:
+    """Expand an entry's flat agent selector list."""
+    available = {relative.with_suffix("").as_posix() for _, relative in find_agents(source_dir)}
+    if agents_raw is None:
+        return available
+    return _expand_patterns(agents_raw, available) & available
 
 
 def _last_commit_info(repo_dir: Path) -> str | None:
@@ -436,6 +463,8 @@ def _update_lists(
     source_dir: Path,
     skills_dir: Path,
     commands_dir: Path,
+    agents_dir: Path,
+    enabled_agents: set[str],
     use_copy: bool,
     repo_key: str,
     new_found: NewSkills,
@@ -467,6 +496,8 @@ def _update_lists(
 
     # Commands come along for the ride whenever we link anything from the source.
     link_commands(source_dir, commands_dir, copy=use_copy)
+    link_agents(source_dir, agents_dir, only=enabled_agents, copy=use_copy)
+    remove_unselected_agents(source_dir, agents_dir, enabled_agents)
 
     for skill_name in sorted(disabled_set):
         skill_path = skills_dir / skill_name

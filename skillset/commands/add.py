@@ -10,8 +10,16 @@ from skillset.commands._templates import (
     GLOBAL_SKILLSET_TEMPLATE,
     LOCAL_SKILLSET_TEMPLATE,
 )
-from skillset.discovery import find_commands, find_skills
-from skillset.linking import has_glob, is_managed, link_commands, link_skills, normalize_glob
+from skillset.discovery import find_agents, find_commands, find_skills
+from skillset.linking import (
+    has_glob,
+    is_managed,
+    link_agents,
+    link_commands,
+    link_skills,
+    normalize_glob,
+    remove_unselected_agents,
+)
 from skillset.manifest import record_install
 from skillset.paths import (
     SKILLSET_CONFIG_FILE,
@@ -19,12 +27,14 @@ from skillset.paths import (
     add_to_skillset,
     ensure_global_skills_symlinks,
     find_skillset_root,
+    get_global_agents_dir,
     get_global_commands_dir,
     get_global_skills_dir,
     get_global_skillset_path,
     get_local_skillset_path,
     get_repo_roots,
     load_skillset,
+    set_skillset_agents,
     set_skillset_ref,
     set_skillset_snapshot,
     update_skillset_skills,
@@ -33,6 +43,7 @@ from skillset.repo import get_head_sha
 from skillset.ui import fzf_select, fzf_select_skills, prompt_skill_selection
 
 SkillSelectionResult = tuple[list[str], list[str] | None, list[str] | None]
+AgentSelectionResult = tuple[list[str], list[str] | None]
 
 
 def cmd_add(
@@ -40,6 +51,7 @@ def cmd_add(
     repo: str | None = None,
     g: bool = False,
     skills: list[str] | None = None,
+    agents: list[str] | None = None,
     subpath: str | None = None,
     ref: str | None = None,
     copy: bool = False,
@@ -129,16 +141,25 @@ def cmd_add(
     linked_commands = _link_commands_for_add(source_dir, commands_dir, interactive, use_copy)
     _print_linked("command", linked_commands, use_copy, commands_dir)
 
-    if toml_key and (linked_skills or linked_commands):
+    agents_dir = (skillset_root / ".claude" / "agents") if is_local else get_global_agents_dir()
+    linked_agents, agent_selectors = _link_agents_for_add(
+        source_dir, agents_dir, agents, interactive, use_copy
+    )
+    _remove_unselected_for_explicit_filter(source_dir, agents_dir, linked_agents, agent_selectors)
+    _print_linked("agent", linked_agents, use_copy, agents_dir)
+
+    linked_any = linked_skills or linked_commands or linked_agents
+    if toml_key and linked_any:
         _record_install(repo_dir, subpath, use_copy, is_local, trial, skills)
 
-    if toml_key and (linked_skills or linked_commands) and not trial:
+    if toml_key and linked_any and not trial:
         _ensure_toml_exists(is_editable, is_local, skillset_root)
         _register_in_toml(
             toml_key,
             subpath,
             enabled_list,
             disabled_list,
+            agent_selectors,
             is_editable,
             toml_source,
             is_local,
@@ -148,8 +169,8 @@ def cmd_add(
             unsnapshot,
         )
 
-    if not linked_skills and not linked_commands:
-        print("No skills found in repo")
+    if not linked_any:
+        print("No skills found in repo (and no commands or agents)")
 
     if temp_dir:
         shutil.rmtree(temp_dir, ignore_errors=True)
@@ -181,6 +202,7 @@ def _do_fetch(
             subpath,
             [],
             disabled,
+            [],
             is_editable,
             toml_source,
             is_local,
@@ -320,6 +342,58 @@ def _link_commands_for_add(
     return link_commands(source_dir, commands_dir, copy=use_copy)
 
 
+def _agent_names(source_dir: Path) -> set[str]:
+    """Return install-relative agent names without the Markdown suffix."""
+    return {relative.with_suffix("").as_posix() for _, relative in find_agents(source_dir)}
+
+
+def _remove_unselected_for_explicit_filter(
+    source_dir: Path,
+    agents_dir: Path,
+    linked_agents: list[str],
+    selectors: list[str] | None,
+) -> None:
+    """Apply replacement semantics only when an agent filter was supplied."""
+    if selectors is not None:
+        remove_unselected_agents(source_dir, agents_dir, set(linked_agents))
+
+
+def _link_agents_for_add(
+    source_dir: Path,
+    agents_dir: Path,
+    agents: list[str] | None,
+    interactive: bool,
+    use_copy: bool,
+) -> AgentSelectionResult:
+    """Select and link agents, returning linked names and persisted selectors."""
+    available = _agent_names(source_dir)
+    if interactive:
+        if not available:
+            return [], None
+        selected = set(fzf_select(sorted(available), prompt="Agents> "))
+        return (
+            link_agents(source_dir, agents_dir, only=selected, copy=use_copy),
+            sorted(selected),
+        )
+    if agents is None:
+        return link_agents(source_dir, agents_dir, copy=use_copy), None
+
+    patterns = {normalize_glob(name) for name in agents if has_glob(name)}
+    literals = {name.removesuffix(".md") for name in agents if not has_glob(name)}
+    matched = {name for name in available if any(fnmatch.fnmatch(name, p) for p in patterns)}
+    selected = (literals & available) | matched
+    for name in sorted(literals - available):
+        print(f"  Agent '{name}' not found")
+    for pattern in sorted(patterns):
+        if not any(fnmatch.fnmatch(name, pattern) for name in available):
+            print(f"  Pattern '{pattern}' matched no agents")
+    enabled = sorted((literals & available) | patterns)
+    return (
+        link_agents(source_dir, agents_dir, only=selected, copy=use_copy),
+        enabled,
+    )
+
+
 def _print_linked(kind: str, linked: list[str], use_copy: bool, target_dir: Path) -> None:
     """Print linked skills/commands summary."""
     if linked:
@@ -420,6 +494,7 @@ def _register_in_toml(
     subpath: str | None,
     enabled: list[str] | None,
     disabled: list[str] | None,
+    agents: list[str] | None,
     is_editable: bool,
     toml_source: str | None,
     is_local: bool,
@@ -441,6 +516,7 @@ def _register_in_toml(
         path=subpath,
         enabled=enabled,
         disabled=disabled,
+        agents=agents,
         editable=is_editable,
         source=toml_source,
         ref=ref,
@@ -465,15 +541,11 @@ def _register_in_toml(
 
     # Fold new selections into existing enabled list.
     # Newly-enabled names should also leave the disabled list if they were there.
-    if enabled and "*" in enabled:
-        return  # nothing sensible to fold when the user asked for "all"
-    if not enabled:
-        return
-    updated = update_skillset_skills(
-        toml_path,
-        toml_key,
-        add_enabled=enabled,
-    )
+    updated = False
+    if enabled and "*" not in enabled:
+        updated |= update_skillset_skills(toml_path, toml_key, add_enabled=enabled)
+    if agents is not None:
+        updated |= set_skillset_agents(toml_path, toml_key, agents)
     if updated:
         print(f"Updated {abbrev(toml_path)}")
 

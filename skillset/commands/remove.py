@@ -20,6 +20,7 @@ from skillset.paths import (
     SKILLSET_CONFIG_FILE,
     abbrev,
     find_skillset_root,
+    get_global_agents_dir,
     get_global_commands_dir,
     get_global_skills_dir,
     get_global_skillset_path,
@@ -164,10 +165,12 @@ def cmd_remove_repo(repo_key: str, *, g: bool = False) -> None:
     commands_dir = (
         (skillset_root / ".claude" / "commands") if is_local else get_global_commands_dir()
     )
+    agents_dir = (skillset_root / ".claude" / "agents") if is_local else get_global_agents_dir()
     toml_path = (skillset_root / SKILLSET_CONFIG_FILE) if is_local else get_global_skillset_path()
 
     removed = _remove_managed_from_source(skills_dir, repo_key, "skill")
     removed += _remove_managed_from_source(commands_dir, repo_key, "command")
+    removed += _remove_managed_from_source(agents_dir, repo_key, "agent", recursive=True)
 
     removed_from_toml = remove_from_skillset(toml_path, repo_key)
     if removed_from_toml:
@@ -185,12 +188,15 @@ def cmd_remove_repo(repo_key: str, *, g: bool = False) -> None:
         sys.exit(1)
 
 
-def _remove_managed_from_source(target_dir: Path, repo_key: str, kind: str) -> int:
+def _remove_managed_from_source(
+    target_dir: Path, repo_key: str, kind: str, *, recursive: bool = False
+) -> int:
     """Remove managed items in target_dir sourced from repo_key. Returns count removed."""
     if not target_dir.exists():
         return 0
     removed = 0
-    for item in sorted(target_dir.iterdir()):
+    items = target_dir.rglob("*") if recursive else target_dir.iterdir()
+    for item in sorted(items):
         if not is_managed(item):
             continue
         source = _get_managed_source(item)
@@ -200,6 +206,12 @@ def _remove_managed_from_source(target_dir: Path, repo_key: str, kind: str) -> i
             remove_managed(item)
             print(f"Removed {kind} {item.name}")
             removed += 1
+    if recursive:
+        for directory in sorted(
+            (path for path in target_dir.rglob("*") if path.is_dir()), reverse=True
+        ):
+            if not any(directory.iterdir()):
+                directory.rmdir()
     return removed
 
 

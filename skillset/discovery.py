@@ -1,4 +1,4 @@
-"""Skill and command discovery — find SKILL.md and commands/ in repos."""
+"""Skill, command, and agent discovery in repositories."""
 
 from pathlib import Path
 
@@ -60,3 +60,33 @@ def find_commands(repo_dir: Path) -> list[Path]:
         if cmd_file not in commands:
             commands.append(cmd_file)
     return commands
+
+
+def find_agents(repo_dir: Path) -> list[tuple[Path, Path]]:
+    """Find Claude agent files, returning ``(source, install-relative path)``.
+
+    Agents are Markdown files below any directory named ``agents``. Unlike the
+    other hidden directories, ``.claude/agents`` is an intentional canonical
+    source and is included. If *repo_dir* is itself named ``agents``, it is
+    treated as the agent root; this makes ``-p path/to/agents`` useful.
+    """
+    roots = [repo_dir] if repo_dir.name == "agents" else []
+    roots.extend(
+        path
+        for path in repo_dir.glob("**/agents")
+        if path.is_dir()
+        and not any(
+            part.startswith(".") and part != ".claude" for part in path.relative_to(repo_dir).parts
+        )
+    )
+    agents: list[tuple[Path, Path]] = []
+    seen: set[Path] = set()
+    for root in roots:
+        for agent_file in root.rglob("*.md"):
+            relative = agent_file.relative_to(root)
+            if any(part.startswith(".") for part in relative.parts):
+                continue
+            if agent_file not in seen:
+                agents.append((agent_file, relative))
+                seen.add(agent_file)
+    return agents

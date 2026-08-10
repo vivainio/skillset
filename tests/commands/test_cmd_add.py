@@ -251,6 +251,62 @@ def test_add_empty_repo_reports_nothing(
     assert "No skills found in repo" in output
 
 
+def test_add_agents_from_subpath(env: Env, tmp_path: Path) -> None:
+    repo = tmp_path / "repo-with-packages"
+    selected = repo / "package-a" / "agents" / "review"
+    selected.mkdir(parents=True)
+    (selected / "security.md").write_text("# security\n")
+    other = repo / "package-b" / "agents"
+    other.mkdir(parents=True)
+    (other / "tester.md").write_text("# tester\n")
+
+    cmd_add(repo=str(repo), subpath="package-a")
+
+    agents_dir = env.home / ".claude" / "agents"
+    assert (agents_dir / "review" / "security.md").is_symlink()
+    assert not (agents_dir / "tester.md").exists()
+
+
+def test_add_agents_with_glob(env: Env, tmp_path: Path) -> None:
+    repo = tmp_path / "agent-source"
+    root = repo / "agents"
+    root.mkdir(parents=True)
+    for name in ("review-code", "review-security", "tester"):
+        (root / f"{name}.md").write_text(f"# {name}\n")
+
+    cmd_add(repo=str(repo), agents=["review-%"])
+
+    agents_dir = env.home / ".claude" / "agents"
+    assert (agents_dir / "review-code.md").is_symlink()
+    assert (agents_dir / "review-security.md").is_symlink()
+    assert not (agents_dir / "tester.md").exists()
+
+    from skillset.paths import load_skillset
+
+    entry = next(iter(load_skillset(env.home / ".claude" / "skillset.yaml")["skills"].values()))
+    assert entry["agents"] == ["review-*"]
+
+
+def test_add_agent_filter_replaces_existing_policy(env: Env, tmp_path: Path) -> None:
+    repo = tmp_path / "agent-source"
+    root = repo / "agents"
+    root.mkdir(parents=True)
+    for name in ("reviewer", "tester"):
+        (root / f"{name}.md").write_text(f"# {name}\n")
+
+    cmd_add(repo=str(repo))
+    cmd_add(repo=str(repo), agents=["reviewer"])
+
+    agents_dir = env.home / ".claude" / "agents"
+    assert (agents_dir / "reviewer.md").is_symlink()
+    assert not (agents_dir / "tester.md").exists()
+
+    from skillset.paths import load_skillset
+
+    entry = next(iter(load_skillset(env.home / ".claude" / "skillset.yaml")["skills"].values()))
+    assert entry["agents"] == ["reviewer"]
+
+
 def test_add_links_skills_from_repo_with_settings(
     env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

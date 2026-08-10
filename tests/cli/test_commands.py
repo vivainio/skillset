@@ -44,6 +44,12 @@ def test_add_with_options() -> None:
         assert kwargs["skills"] == ["skill-a"]
 
 
+def test_add_with_agent_patterns() -> None:
+    with patch("skillset.cli.cmd_add") as mock:
+        runner.invoke(app, ["add", "owner/repo", "-a", "review-%", "--agent", "tester"])
+        assert mock.call_args[1]["agents"] == ["review-%", "tester"]
+
+
 def test_remove_invokes_cmd_remove() -> None:
     with patch("skillset.cli.cmd_remove") as mock:
         runner.invoke(app, ["remove", "skill-a"])

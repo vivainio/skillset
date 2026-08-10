@@ -17,9 +17,11 @@ from skillset.manifest import load_manifest
 from skillset.paths import (
     abbrev,
     find_skillset_root,
+    get_global_agents_dir,
     get_global_commands_dir,
     get_global_skills_dir,
     get_profile_store_dir,
+    get_project_agents_dir,
     get_project_commands_dir,
     get_project_skills_dir,
     get_repo_roots,
@@ -62,7 +64,8 @@ def _print_grouped(
             suffix = f"({len(description)} chars){trial_tag}"
         else:
             suffix = trial_tag
-        groups.setdefault(target_dir, []).append((item.name, suffix))
+        display_name = item.relative_to(install_dir).as_posix()
+        groups.setdefault(target_dir, []).append((display_name, suffix))
     for target_dir, entries in sorted(groups.items()):
         print(f"  {target_dir}:")
         name_width = max(len(name) for name, _ in entries)
@@ -107,18 +110,21 @@ def _list_repos(cache_dir: Path) -> list[str]:
     return repos
 
 
-def _resolve_project_dirs() -> tuple[Path | None, Path | None]:
-    """Resolve project skills and commands dirs with skillset.yaml fallback."""
+def _resolve_project_dirs() -> tuple[Path | None, Path | None, Path | None]:
+    """Resolve project artifact dirs with skillset.yaml fallback."""
     skills_dir = get_project_skills_dir()
     commands_dir = get_project_commands_dir()
-    if skills_dir is None or commands_dir is None:
+    agents_dir = get_project_agents_dir()
+    if skills_dir is None or commands_dir is None or agents_dir is None:
         skillset_root = find_skillset_root()
         if skillset_root:
             if skills_dir is None:
                 skills_dir = skillset_root / ".claude" / "skills"
             if commands_dir is None:
                 commands_dir = skillset_root / ".claude" / "commands"
-    return skills_dir, commands_dir
+            if agents_dir is None:
+                agents_dir = skillset_root / ".claude" / "agents"
+    return skills_dir, commands_dir, agents_dir
 
 
 def _dir_contents(d: Path | None) -> list[Path]:
@@ -172,7 +178,7 @@ def _print_available(installed: set[str]) -> None:
 def cmd_list(*, prune: bool = False, available: bool = False) -> None:
     """List installed skills and commands."""
     global_skills_dir = get_global_skills_dir()
-    project_skills_dir, project_commands_dir = _resolve_project_dirs()
+    project_skills_dir, project_commands_dir, project_agents_dir = _resolve_project_dirs()
 
     global_skills = _dir_contents(global_skills_dir)
     project_skills = _dir_contents(project_skills_dir)
@@ -185,6 +191,13 @@ def cmd_list(*, prune: bool = False, available: bool = False) -> None:
     global_commands_dir = get_global_commands_dir()
     global_commands = _dir_contents(global_commands_dir)
     project_commands = _dir_contents(project_commands_dir)
+    global_agents_dir = get_global_agents_dir()
+    global_agents = sorted(global_agents_dir.rglob("*.md")) if global_agents_dir.exists() else []
+    project_agents = (
+        sorted(project_agents_dir.rglob("*.md"))
+        if project_agents_dir and project_agents_dir.exists()
+        else []
+    )
 
     manifest = load_manifest()
     trial_repos = {k for k, v in manifest.items() if v.get("trial")}
@@ -212,6 +225,9 @@ def cmd_list(*, prune: bool = False, available: bool = False) -> None:
     pg(global_commands, lambda p: p.is_symlink(), "Global commands", global_commands_dir)
     if project_commands_dir:
         pg(project_commands, lambda p: p.is_symlink(), "Project commands", project_commands_dir)
+    pg(global_agents, lambda p: p.is_symlink(), "Global agents", global_agents_dir)
+    if project_agents_dir:
+        pg(project_agents, lambda p: p.is_symlink(), "Project agents", project_agents_dir)
 
     repo_groups = [(root, _list_repos(root)) for root in get_repo_roots()]
     for root, repos in repo_groups:
@@ -220,7 +236,13 @@ def cmd_list(*, prune: bool = False, available: bool = False) -> None:
 
     has_repos = any(repos for _, repos in repo_groups)
     has_anything = (
-        global_skills or project_skills or global_commands or project_commands or has_repos
+        global_skills
+        or project_skills
+        or global_commands
+        or project_commands
+        or global_agents
+        or project_agents
+        or has_repos
     )
     if not has_anything:
-        print("No skills, commands, or repos found")
+        print("No skills, commands, or repos found (including no agents)")

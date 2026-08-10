@@ -68,6 +68,14 @@ def add(
             help="Add only this skill by name or glob (repeatable); % is a shell-safe wildcard",
         ),
     ] = None,
+    agent: Annotated[
+        list[str] | None,
+        typer.Option(
+            "-a",
+            "--agent",
+            help="Add only this agent by name or glob (repeatable); % is a shell-safe wildcard",
+        ),
+    ] = None,
     subpath: Annotated[
         str | None,
         typer.Option("-p", "--path", help="Subdirectory within the repo to use as root"),
@@ -123,6 +131,7 @@ def add(
         repo=repo,
         g=global_,
         skills=skill,
+        agents=agent,
         subpath=subpath,
         ref=ref,
         copy=copy,

@@ -1,13 +1,13 @@
 ---
 name: skillset
-description: Manage AI skills and commands across projects with the skillset CLI. Use when the user wants to add, remove, search, list, or update Claude Code skills/commands from a GitHub repo or local directory, mentions "skillset", "skillset.yaml", or asks to install/discover a skill.
+description: Manage AI skills, commands, and agents across projects with the skillset CLI. Use when the user wants to add, remove, search, list, or update Claude Code skills, commands, or agents from a GitHub repo or local directory, mentions "skillset", "skillset.yaml", or asks to install or discover one.
 ---
 
 # skillset - Skill Manager CLI
 
-Manages Claude Code (and Copilot) skills and slash commands, symlinked or copied from GitHub repos or local directories. See https://github.com/vivainio/skillset for source.
+Manages Claude Code (and Copilot) skills, slash commands, and Claude Code agents, symlinked or copied from GitHub repos or local directories. See https://github.com/vivainio/skillset for source.
 
-**Scope:** skill-management commands auto-detect scope -- if a `skillset.yaml` is found in the current directory or a parent, skills install to the project (`.claude/skills/`); otherwise they install globally (`~/.claude/skills/`). Pass `-g`/`--global` to force global scope. `install-skills` always installs globally.
+**Scope:** management commands auto-detect scope -- if a `skillset.yaml` is found in the current directory or a parent, artifacts install under the project's `.claude/`; otherwise they install under `~/.claude/`. Pass `-g`/`--global` to force global scope. `install-skills` always installs globally.
 
 **Start here:** `skillset search <term>` to find a skill across cached, editable, and unmanaged sources, `skillset add owner/repo` to install skills from a repo.
 
@@ -20,7 +20,10 @@ skillset add vivainio/agent-skills -g                  # force global install
 skillset add vivainio/agent-skills -s zaira            # only the zaira skill
 skillset add vivainio/agent-skills -s zaira -s other   # multiple specific skills
 skillset add vivainio/agent-skills -s doc-%            # glob pattern -- % is a shell-safe wildcard, no quoting needed
-skillset add vivainio/agent-skills -p extra-skills     # skills from a subdirectory only
+skillset add owner/repo -a reviewer                    # only this agent
+skillset add owner/repo -a review-% -a tester          # repeatable agent names/globs
+skillset add vivainio/agent-skills -p extra-skills     # discover artifacts only in this subtree
+skillset add owner/repo -p package/agents -a review-%  # -p may point directly at an agents directory
 skillset add https://github.com/vivainio/agent-skills
 skillset add https://github.com/vivainio/agent-skills/tree/main/extra-skills
 skillset add /path/to/skills-dir                       # local dir; registered as editable
@@ -47,10 +50,10 @@ skillset remove ai-%            # glob pattern -- % is a shell-safe wildcard, no
 skillset remove -i              # interactive fzf selection
 
 # Remove a whole repo -- a name containing "/" is treated as owner/repo, not a skill name:
-# unlinks every skill/command sourced from it, drops its skillset.yaml entry, deletes the cached clone
+# unlinks every skill/command/agent sourced from it, drops its skillset.yaml entry, deletes the cached clone
 skillset remove JuliusBrussee/caveman
 
-# List installed skills, commands, and cached repos
+# List installed skills, commands, agents, and cached repos
 skillset list
 skillset list --prune           # also remove broken symlinks
 
@@ -90,6 +93,11 @@ skills:
   vivainio/agent-skills:
     enabled: ["doc-*"]              # glob patterns
     disabled: [doc-draft]
+    agents: ["review-*", tester]    # flat agent selector list; globs supported
+
+  owner/repo:
+    enabled: ["*"]
+    agents: []                      # install no agents
 
   vivainio/agent-skills:
     path: extra-skills              # skills from a subdirectory
@@ -109,11 +117,14 @@ links:
   specs: ../project-docs/specs       # arbitrary cross-repo symlinks
 ```
 
-`skillset update` applies this file: pulls each repo, links `enabled`, removes `disabled`. New skills not yet listed in either list are reported (local config) or prompted interactively (global config) unless `-y`/`-n` is passed.
+`skillset update` applies this file: pulls each repo, links `enabled`, removes `disabled`, and synchronizes agents using the flat `agents` selector list. With no `agents` key, all discovered agents are installed; `agents: []` installs none. New skills not yet listed in either skill list are reported (local config) or prompted interactively (global config) unless `-y`/`-n` is passed.
 
 ## How it works
 
-- Skills/commands are symlinked (Linux/Mac) or junctioned (Windows) from cached repos, not copied, unless `--copy`/`--no-cache`/`--snapshot`.
+- Skills are identified by `SKILL.md` anywhere below the selected source root. Commands are Markdown below `commands/`; agents are Markdown below `agents/`, including canonical `.claude/agents/` sources.
+- Agent names are install-relative paths without `.md`: `agents/review/security.md` is `review/security`. Nested paths are preserved in `.claude/agents/`.
+- `-p` changes the discovery root for skills, commands, and agents. `-a`/`--agent` is repeatable, accepts the same `*`/`%` globs as skills, and replaces the source's prior agent selector list.
+- Skills/commands/agents are symlinked (Linux/Mac) or junctioned where applicable on Windows from cached repos, not copied, unless `--copy`/`--no-cache`/`--snapshot`.
 - Repository sources live in `~/.local/share/skillset/repos/` on Linux,
   `~/Library/Application Support/skillset/repos/` on macOS, and
   `%LOCALAPPDATA%\skillset\repos` on Windows. Legacy
