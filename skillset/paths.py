@@ -44,9 +44,19 @@ def get_repo_roots() -> list[Path]:
     return [get_cache_dir(), get_legacy_cache_dir()]
 
 
+def get_claude_home() -> Path:
+    """Get the base Claude config directory.
+
+    Honors CLAUDE_CONFIG_DIR (used to run multiple Claude Code profiles from
+    one machine); falls back to ~/.claude.
+    """
+    override = os.environ.get("CLAUDE_CONFIG_DIR")
+    return Path(override).expanduser() if override else Path.home() / ".claude"
+
+
 def get_global_skills_dir() -> Path:
     """Get global Claude skills directory."""
-    return Path.home() / ".claude" / "skills"
+    return get_claude_home() / "skills"
 
 
 def ensure_global_skills_symlinks() -> list[Path]:
@@ -123,12 +133,12 @@ def get_project_skills_dir() -> Path | None:
 
 def get_global_commands_dir() -> Path:
     """Get global Claude commands directory."""
-    return Path.home() / ".claude" / "commands"
+    return get_claude_home() / "commands"
 
 
 def get_global_agents_dir() -> Path:
     """Get global Claude agents directory."""
-    return Path.home() / ".claude" / "agents"
+    return get_claude_home() / "agents"
 
 
 def get_project_commands_dir() -> Path | None:
@@ -145,17 +155,17 @@ def get_project_agents_dir() -> Path | None:
 
 def get_global_skillset_path() -> Path:
     """Get the path to the global skillset.yaml."""
-    return Path.home() / ".claude" / SKILLSET_CONFIG_FILE
+    return get_claude_home() / SKILLSET_CONFIG_FILE
 
 
 def get_profiles_path() -> Path:
     """Get the global profile configuration path."""
-    return Path.home() / ".claude" / ".skillset" / "profiles.yaml"
+    return get_claude_home() / ".skillset" / "profiles.yaml"
 
 
 def get_profile_store_dir() -> Path:
     """Get the private store for adopted unmanaged skills."""
-    return Path.home() / ".claude" / ".skillset" / "skills"
+    return get_claude_home() / ".skillset" / "skills"
 
 
 def get_local_skillset_path() -> Path | None:
@@ -407,7 +417,12 @@ def require_project_dir(path: Path | None, kind: str = "project") -> Path:
 
 
 def abbrev(path: str | Path) -> str:
-    """Replace home directory with ~ in a path string."""
+    """Replace home directory (or an active CLAUDE_CONFIG_DIR) with a short form."""
     s = str(path)
+    override = os.environ.get("CLAUDE_CONFIG_DIR")
+    if override:
+        config_home = str(Path(override).expanduser())
+        if s.startswith(config_home):
+            return s.replace(config_home, "$CLAUDE_CONFIG_DIR", 1)
     home = str(Path.home())
     return s.replace(home, "~", 1) if s.startswith(home) else s

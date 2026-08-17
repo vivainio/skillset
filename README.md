@@ -276,6 +276,10 @@ skillset update --repair -y                  # repair and remove redundant clone
   `~/Library/Application Support/skillset/repos/` on macOS, and
   `%LOCALAPPDATA%\skillset\repos` on Windows. Existing clones in the legacy
   `~/.cache/skillset/repos/` location remain supported.
+- Global scope honors `CLAUDE_CONFIG_DIR`: when set, `skillset` reads and
+  writes `skills/`, `commands/`, `agents/`, and `skillset.yaml` under that
+  directory instead of `~/.claude/`, matching whichever Claude Code profile
+  the env var points at.
 
 ## Comparison with Vercel's `npx skills`
 

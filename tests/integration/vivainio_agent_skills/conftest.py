@@ -35,6 +35,7 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Env:
     project.mkdir()
 
     monkeypatch.setattr(Path, "home", staticmethod(lambda: home))
+    monkeypatch.delenv("CLAUDE_CONFIG_DIR", raising=False)
     monkeypatch.setattr("skillset.paths.get_git_root", lambda: project)
     for mod in (
         "skillset.commands.add",
