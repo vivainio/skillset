@@ -35,6 +35,7 @@ from skillset.paths import (
     get_global_skills_dir,
     get_global_skillset_path,
     load_skillset,
+    resolve_editable_source,
     save_skillset,
     update_skillset_skills,
 )
@@ -441,10 +442,7 @@ def _resolve_editable_source(
         print(f"\n{repo_key}: editable requires 'source' path")
         return None, None, None, None, set()
     print(f"\nUpdating {repo_key} (editable)...")
-    expanded = Path(source_str).expanduser()
-    base_dir = (
-        expanded.resolve() if expanded.is_absolute() else (file_path.parent / expanded).resolve()
-    )
+    base_dir = resolve_editable_source(source_str, file_path)
     source_dir = base_dir / path_str if path_str else base_dir
     if not source_dir.is_dir():
         if path_str:

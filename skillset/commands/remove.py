@@ -28,6 +28,7 @@ from skillset.paths import (
     get_repo_roots,
     load_skillset,
     remove_from_skillset,
+    resolve_editable_source,
     update_skillset_skills,
 )
 from skillset.repo import get_repo_dir
@@ -143,9 +144,7 @@ def _entry_for_source(config: dict, config_path: Path, skill_path: Path) -> str 
         if source_text == repo_key:
             return repo_key
         if entry.get("editable") and entry.get("source"):
-            root = Path(entry["source"]).expanduser()
-            if not root.is_absolute():
-                root = config_path.parent / root
+            root = resolve_editable_source(entry["source"], config_path)
         else:
             root = get_repo_dir(*repo_key.split("/", 1))
         effective = root / entry["path"] if entry.get("path") else root

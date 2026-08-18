@@ -7,7 +7,7 @@ from pathlib import Path
 
 from skillset.discovery import find_skills
 from skillset.linking import has_glob
-from skillset.paths import abbrev, get_repo_roots, save_skillset
+from skillset.paths import abbrev, get_repo_roots, resolve_editable_source, save_skillset
 from skillset.repo import get_repo_dir
 
 
@@ -47,10 +47,8 @@ def _duplicate_groups(config: dict, file_path: Path) -> dict[str, dict]:
         source = value.get("source")
         if not source:
             continue
-        source_path = Path(source).expanduser()
-        if not source_path.is_absolute():
-            source_path = file_path.parent / source_path
-        identity = _git_root_and_remote(source_path.resolve())
+        source_path = resolve_editable_source(source, file_path)
+        identity = _git_root_and_remote(source_path)
         if identity:
             root, repo_key = identity
             groups.setdefault(repo_key, {"root": root, "editable": []})["editable"].append(key)
@@ -104,10 +102,8 @@ def _redundant_cache_candidates(config: dict, file_path: Path) -> list[tuple[str
         source = entry.get("source")
         if not source or entry.get("ref"):
             continue
-        source_path = Path(source).expanduser()
-        if not source_path.is_absolute():
-            source_path = file_path.parent / source_path
-        identity = _git_root_and_remote(source_path.resolve())
+        source_path = resolve_editable_source(source, file_path)
+        identity = _git_root_and_remote(source_path)
         if not identity:
             continue
         root, repo_key = identity
@@ -158,9 +154,7 @@ def _missing_editable_entries(config: dict, file_path: Path) -> dict[str, Path]:
     for key, entry in (config.get("skills") or {}).items():
         if not isinstance(entry, dict) or not entry.get("editable") or not entry.get("source"):
             continue
-        source = Path(entry["source"]).expanduser()
-        if not source.is_absolute():
-            source = file_path.parent / source
+        source = resolve_editable_source(entry["source"], file_path)
         effective = source / entry["path"] if entry.get("path") else source
         if not effective.is_dir():
             missing[key] = effective

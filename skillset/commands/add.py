@@ -34,6 +34,7 @@ from skillset.paths import (
     get_local_skillset_path,
     get_repo_roots,
     load_skillset,
+    resolve_editable_source,
     set_skillset_agents,
     set_skillset_ref,
     set_skillset_snapshot,
@@ -474,10 +475,7 @@ def _reuse_registered_editable(
     for key, entry in (load_skillset(toml_path).get("skills") or {}).items():
         if not isinstance(entry, dict) or not entry.get("editable") or not entry.get("source"):
             continue
-        source = Path(entry["source"]).expanduser()
-        if not source.is_absolute():
-            source = toml_path.parent / source
-        source = source.resolve()
+        source = resolve_editable_source(entry["source"], toml_path)
         try:
             repo_dir.resolve().relative_to(source)
         except ValueError:

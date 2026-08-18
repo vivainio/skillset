@@ -125,6 +125,54 @@ def get_git_root() -> Path | None:
         return None
 
 
+def get_main_worktree_root(cwd: Path | None = None) -> Path | None:
+    """Get the root of the repo's main working tree, even from a linked worktree.
+
+    `git rev-parse --git-common-dir` always points at the shared `.git`
+    directory that lives inside the *main* worktree, regardless of which
+    linked worktree it's invoked from (a linked worktree only has a `.git`
+    file with a `gitdir:` pointer, not the real thing). Its parent is the
+    main worktree's root. Returns None outside a git repo or for a bare repo.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        common_dir = Path(result.stdout.strip())
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+    return common_dir.parent if common_dir.name == ".git" else None
+
+
+def resolve_editable_source(source_str: str, config_path: Path) -> Path:
+    """Resolve a possibly-relative `source:` path from a skillset.yaml entry.
+
+    Relative paths are anchored to the skillset.yaml's own directory, as
+    normal. If that directory is a linked git worktree (e.g. a per-branch
+    worktree checked out somewhere other than alongside its sibling repos),
+    a sibling-relative path won't exist there even though it does next to
+    the main worktree -- fall back to resolving against the main worktree's
+    root in that case.
+    """
+    expanded = Path(source_str).expanduser()
+    if expanded.is_absolute():
+        return expanded.resolve()
+    config_dir = config_path.parent
+    primary = (config_dir / expanded).resolve()
+    if primary.exists():
+        return primary
+    main_root = get_main_worktree_root(config_dir)
+    if main_root is not None and main_root.resolve() != config_dir.resolve():
+        fallback = (main_root / expanded).resolve()
+        if fallback.exists():
+            return fallback
+    return primary
+
+
 def get_project_skills_dir() -> Path | None:
     """Get project-local Claude skills directory, or None if not in a git repo."""
     root = get_git_root()
