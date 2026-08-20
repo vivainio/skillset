@@ -465,12 +465,14 @@ def require_project_dir(path: Path | None, kind: str = "project") -> Path:
 
 
 def abbrev(path: str | Path) -> str:
-    """Replace home directory (or an active CLAUDE_CONFIG_DIR) with a short form."""
+    """Replace the home directory prefix with `~`, wherever the path lives.
+
+    An active CLAUDE_CONFIG_DIR profile is shown as its real absolute path
+    (still `~`-shortened if it happens to live under the home directory)
+    rather than as the `$CLAUDE_CONFIG_DIR` env var name -- the shorthand
+    reads fine to whoever set the override, but is opaque to anyone else
+    looking at the output.
+    """
     s = str(path)
-    override = os.environ.get("CLAUDE_CONFIG_DIR")
-    if override:
-        config_home = str(Path(override).expanduser())
-        if s.startswith(config_home):
-            return s.replace(config_home, "$CLAUDE_CONFIG_DIR", 1)
     home = str(Path.home())
     return s.replace(home, "~", 1) if s.startswith(home) else s

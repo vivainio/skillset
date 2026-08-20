@@ -58,12 +58,21 @@ def test_dependent_paths_follow_override(
     assert getter() == override / suffix
 
 
-def test_abbrev_shortens_override_path(
+def test_abbrev_shows_real_path_under_override(
     home_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     override = tmp_path / "profile-b"
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(override))
-    assert abbrev(override / "skills" / "foo") == "$CLAUDE_CONFIG_DIR/skills/foo"
+    # override lives under home_dir (== tmp_path), so it still gets `~`-shortened.
+    assert abbrev(override / "skills" / "foo") == "~/profile-b/skills/foo"
+
+
+def test_abbrev_shows_full_path_for_override_outside_home(
+    home_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    outside = Path("/elsewhere/profile-b")
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(outside))
+    assert abbrev(outside / "skills" / "foo") == str(outside / "skills" / "foo")
 
 
 def test_abbrev_falls_back_to_home_without_override(home_dir: Path) -> None:
