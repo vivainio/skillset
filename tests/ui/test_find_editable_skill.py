@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+import pytest
+
 from skillset.ui import find_skill
 
 
@@ -109,3 +111,78 @@ def test_finds_skill_in_multiple_sources(home_dir: Path, tmp_path: Path) -> None
 
     matches = find_skill("zaira")
     assert len(matches) == 2
+
+
+def test_finds_skill_via_main_profile_symlink_to_cached_repo(
+    home_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cache_dir = home_dir / ".cache" / "skillset" / "repos" / "owner" / "repo"
+    skill = cache_dir / "zaira"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text("# zaira\n")
+
+    main_skills = home_dir / ".claude" / "skills"
+    main_skills.mkdir(parents=True)
+    (main_skills / "zaira").symlink_to(skill)
+
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "profile-b"))
+
+    matches = find_skill("zaira")
+    assert len(matches) == 1
+    found_dir, toml_key, toml_source, is_editable = matches[0]
+    assert found_dir == cache_dir
+    assert toml_key == "owner/repo"
+    assert toml_source is None
+    assert is_editable is False
+
+
+def test_finds_skill_via_main_profile_symlink_to_local_editable(
+    home_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "my-skills-repo"
+    skill = source / "widget"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text("# widget\n")
+
+    main_skills = home_dir / ".claude" / "skills"
+    main_skills.mkdir(parents=True)
+    (main_skills / "widget").symlink_to(skill)
+
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "profile-b"))
+
+    matches = find_skill("widget")
+    assert len(matches) == 1
+    found_dir, toml_key, toml_source, is_editable = matches[0]
+    assert found_dir == source
+    assert toml_key == f"{tmp_path.name}/my-skills-repo"
+    assert toml_source == str(source)
+    assert is_editable is True
+
+
+def test_skips_main_profile_copy_without_recoverable_source(
+    home_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    main_skills = home_dir / ".claude" / "skills"
+    skill = main_skills / "orphan"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text("# orphan\n")
+    (skill / ".skillset-source").write_text("owner/repo\n")
+
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "profile-b"))
+
+    assert find_skill("orphan") == []
+
+
+def test_does_not_search_main_when_it_is_the_active_profile(
+    home_dir: Path, tmp_path: Path
+) -> None:
+    source = tmp_path / "my-skills-repo"
+    skill = source / "widget"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text("# widget\n")
+
+    main_skills = home_dir / ".claude" / "skills"
+    main_skills.mkdir(parents=True)
+    (main_skills / "widget").symlink_to(skill)
+
+    assert find_skill("widget") == []

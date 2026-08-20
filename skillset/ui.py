@@ -18,6 +18,7 @@ from skillset.linking import (
 from skillset.paths import (
     abbrev,
     get_cache_dir,
+    get_claude_home,
     get_global_skillset_path,
     get_profile_store_dir,
     get_repo_roots,
@@ -60,11 +61,59 @@ def find_skill(skill_name: str) -> list[SkillMatch]:
     matches: list[SkillMatch] = []
     seen_dirs: set[str] = set()
 
+    _search_main_claude_skills(skill_name, matches, seen_dirs)
     _search_profile_store(skill_name, matches, seen_dirs)
     _search_editable_sources(skill_name, matches, seen_dirs)
     _search_cached_repos(skill_name, matches, seen_dirs)
 
     return matches
+
+
+def _search_main_claude_skills(
+    skill_name: str, matches: list[SkillMatch], seen_dirs: set[str]
+) -> None:
+    """Under a CLAUDE_CONFIG_DIR profile, also check the main ~/.claude/skills dir.
+
+    A skill already linked there doesn't need fetching again: resolve what it
+    points at and reuse that as the source, so the profile ends up symlinked
+    to the exact same place instead of re-cloning or re-copying it.
+    """
+    main_home = Path.home() / ".claude"
+    if get_claude_home().resolve() == main_home.resolve():
+        return
+    link_path = main_home / "skills" / skill_name
+    if not is_managed(link_path):
+        return
+
+    if is_link(link_path):
+        actual_skill_dir = link_path.resolve()
+    else:
+        source = get_copy_source(link_path)
+        candidate = Path(source) if source else None
+        if candidate is None or not candidate.is_absolute() or not candidate.is_dir():
+            return
+        actual_skill_dir = candidate.resolve()
+
+    if str(actual_skill_dir) in seen_dirs or not (actual_skill_dir / "SKILL.md").is_file():
+        return
+
+    for cache_dir in get_repo_roots():
+        try:
+            rel = actual_skill_dir.relative_to(cache_dir.resolve())
+        except (ValueError, OSError):
+            continue
+        if len(rel.parts) >= 2 and rel.parts[0] != "local":
+            owner, repo_name = rel.parts[0], rel.parts[1]
+            source_dir = cache_dir.resolve() / owner / repo_name
+            seen_dirs.add(str(source_dir))
+            matches.append(SkillMatch(source_dir, f"{owner}/{repo_name}", None, False))
+            return
+
+    source_dir = actual_skill_dir.parent
+    parent_name = source_dir.parent.name
+    toml_key = f"{parent_name}/{source_dir.name}" if parent_name else source_dir.name
+    seen_dirs.add(str(source_dir))
+    matches.append(SkillMatch(source_dir, toml_key, str(source_dir).replace("\\", "/"), True))
 
 
 def _search_profile_store(skill_name: str, matches: list[SkillMatch], seen_dirs: set[str]) -> None:
