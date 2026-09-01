@@ -159,6 +159,19 @@ A `name` containing `/` is treated as `owner/repo` instead of a skill name:
 unlinks every skill/command sourced from it, drops its `skillset.yaml` entry
 (if any), and deletes the stored clone from the platform data directory.
 
+### Remove every registered repo
+
+```bash
+skillset remove --all      # detected scope (local or global)
+skillset remove --all -g   # global skillset.yaml
+```
+
+Equivalent to running `skillset remove owner/repo` for every entry in
+`skillset.yaml`, then wipes the entire repo cache directory. The cache is
+shared machine-wide (not scoped to local vs. global), so this also deletes
+cached clones belonging to other projects and any untracked trial repos.
+Use it to get a completely fresh start.
+
 ### Search cached skills
 
 ```bash

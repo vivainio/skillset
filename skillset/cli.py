@@ -12,6 +12,7 @@ from skillset.commands import (
     cmd_list,
     cmd_profile,
     cmd_remove,
+    cmd_remove_all,
     cmd_search,
     cmd_update,
 )
@@ -240,8 +241,22 @@ def remove(
         bool,
         typer.Option("-i", "--interactive", help="Select skills to remove with fzf"),
     ] = False,
+    all_: Annotated[
+        bool,
+        typer.Option(
+            "--all",
+            help="Remove every registered repo and wipe the whole (machine-wide) repo cache "
+            "for a fresh start",
+        ),
+    ] = False,
 ) -> None:
     """Remove a skill, or a whole repo (owner/repo) -- links, skillset.yaml entry, and cache."""
+    if all_:
+        if name or interactive:
+            typer.echo("--all cannot be combined with a name or -i", err=True)
+            raise typer.Exit(1)
+        cmd_remove_all(g=global_)
+        return
     cmd_remove(name=name, g=global_, interactive=interactive)
 
 

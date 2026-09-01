@@ -53,6 +53,12 @@ skillset remove -i              # interactive fzf selection
 # unlinks every skill/command/agent sourced from it, drops its skillset.yaml entry, deletes the cached clone
 skillset remove JuliusBrussee/caveman
 
+# Remove every registered repo, then wipe the entire (machine-wide) repo cache dir --
+# also deletes cached clones from other projects and untracked trial repos.
+# Use for a completely fresh start.
+skillset remove --all
+skillset remove --all -g        # global skillset.yaml
+
 # List installed skills, commands, agents, and cached repos
 skillset list
 skillset list --prune           # also remove broken symlinks

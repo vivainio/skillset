@@ -156,6 +156,35 @@ def _entry_for_source(config: dict, config_path: Path, skill_path: Path) -> str 
     return None
 
 
+def cmd_remove_all(*, g: bool = False) -> None:
+    """Remove every repo registered in skillset.yaml, then wipe the whole repo cache.
+
+    The repo cache is shared machine-wide (not scoped to local vs. global), so this
+    also drops cached repos belonging to other projects and untracked trial repos.
+    Gives a completely fresh start.
+    """
+    skillset_root = None if g else find_skillset_root()
+    config_path = (
+        skillset_root / SKILLSET_CONFIG_FILE if skillset_root else get_global_skillset_path()
+    )
+    config = load_skillset(config_path)
+    repo_keys = list((config.get("skills") or {}).keys())
+    if not repo_keys:
+        print(f"No repos registered in {abbrev(config_path)}")
+    else:
+        for repo_key in repo_keys:
+            cmd_remove_repo(repo_key, g=g)
+    _wipe_cache_dirs()
+
+
+def _wipe_cache_dirs() -> None:
+    """Delete every cached repo clone (and the install manifest) machine-wide."""
+    for root in get_repo_roots():
+        if root.exists():
+            shutil.rmtree(root)
+            print(f"Removed cache dir {abbrev(root)}")
+
+
 def cmd_remove_repo(repo_key: str, *, g: bool = False) -> None:
     """Remove a repo entirely: its linked skills/commands, skillset.yaml entry, and cached clone."""
     skillset_root = None if g else find_skillset_root()
