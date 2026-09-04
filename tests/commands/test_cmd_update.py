@@ -92,9 +92,7 @@ def test_sync_command_glob_pattern(env: Env, source_repo: Path) -> None:
     for name in ("review-code", "review-security", "tester"):
         (cmd_dir / f"{name}.md").write_text(f"# {name}\n")
     yaml_file = env.home / ".claude" / "skillset.yaml"
-    yaml_file.write_text(
-        "skills:\n  owner/repo:\n    enabled: ['*']\n    commands: ['review-*']\n"
-    )
+    yaml_file.write_text("skills:\n  owner/repo:\n    enabled: ['*']\n    commands: ['review-*']\n")
 
     with patch("skillset.commands.update.clone_or_pull", return_value=source_repo):
         cmd_update()

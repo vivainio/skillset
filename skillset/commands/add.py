@@ -562,9 +562,25 @@ def _register_in_toml(
         print(f"Added to {abbrev(toml_path)}")
         return
 
-    # Repo already registered. --unsnapshot strips ref+snapshot; otherwise we
-    # only rewrite ref when one was supplied. The --force conflict gate is
-    # what allows reaching this branch with a different ref at all.
+    _update_existing_registration(
+        toml_path, toml_key, enabled, agents, commands, ref, snapshot, unsnapshot
+    )
+
+
+def _update_existing_registration(
+    toml_path: Path,
+    toml_key: str,
+    enabled: list[str] | None,
+    agents: list[str] | None,
+    commands: list[str] | None,
+    ref: str | None,
+    snapshot: bool,
+    unsnapshot: bool,
+) -> None:
+    """Amend an already-registered skillset.yaml entry: ref/snapshot state and selections."""
+    # --unsnapshot strips ref+snapshot; otherwise we only rewrite ref when one
+    # was supplied. The --force conflict gate is what allows reaching this
+    # function with a different ref at all.
     if unsnapshot:
         if set_skillset_ref(toml_path, toml_key, None):
             print(f"Cleared ref in {abbrev(toml_path)}")
