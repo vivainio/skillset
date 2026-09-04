@@ -212,6 +212,24 @@ def link_commands(
     return linked
 
 
+def remove_unselected_commands(repo_dir: Path, target_dir: Path, keep: set[str]) -> None:
+    """Remove linked commands sourced from repo_dir unless their filenames are kept.
+
+    `keep` entries are filenames (with `.md`), matching `link_commands`'s return format.
+    """
+    if not target_dir.exists():
+        return
+    source = repo_dir.resolve()
+    for item in sorted(target_dir.glob("*.md")):
+        if item.name in keep or not item.is_symlink():
+            continue
+        try:
+            item.resolve().relative_to(source)
+        except ValueError:
+            continue
+        item.unlink()
+
+
 def link_agents(
     repo_dir: Path,
     target_dir: Path,

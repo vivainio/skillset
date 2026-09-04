@@ -264,6 +264,7 @@ def add_to_skillset(  # noqa: C901
     enabled: list[str] | None = None,
     disabled: list[str] | None = None,
     agents: list[str] | None = None,
+    commands: list[str] | None = None,
     editable: bool = False,
     source: str | None = None,
     ref: str | None = None,
@@ -304,6 +305,8 @@ def add_to_skillset(  # noqa: C901
         entry["disabled"] = _flow_list(disabled)
     if agents is not None:
         entry["agents"] = _flow_list(agents)
+    if commands is not None:
+        entry["commands"] = _flow_list(commands)
 
     skills[repo_key] = entry
     save_skillset(config_path, data)
@@ -393,6 +396,22 @@ def set_skillset_agents(config_path: Path, repo_key: str, agents: list[str]) -> 
     if entry.get("agents") == replacement:
         return False
     entry["agents"] = replacement
+    save_skillset(config_path, data)
+    return True
+
+
+def set_skillset_commands(config_path: Path, repo_key: str, commands: list[str]) -> bool:
+    """Replace an existing entry's flat command selector list."""
+    if not config_path.exists():
+        return False
+    data = load_skillset(config_path)
+    entry = (data.get("skills") or {}).get(repo_key)
+    if not isinstance(entry, dict):
+        return False
+    replacement = _flow_list(commands)
+    if entry.get("commands") == replacement:
+        return False
+    entry["commands"] = replacement
     save_skillset(config_path, data)
     return True
 

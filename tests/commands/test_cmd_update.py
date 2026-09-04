@@ -87,6 +87,50 @@ def test_sync_empty_agent_list_removes_managed_agents(env: Env, source_repo: Pat
     assert not (target / "reviewer.md").exists()
 
 
+def test_sync_command_glob_pattern(env: Env, source_repo: Path) -> None:
+    cmd_dir = source_repo / "commands"
+    for name in ("review-code", "review-security", "tester"):
+        (cmd_dir / f"{name}.md").write_text(f"# {name}\n")
+    yaml_file = env.home / ".claude" / "skillset.yaml"
+    yaml_file.write_text(
+        "skills:\n  owner/repo:\n    enabled: ['*']\n    commands: ['review-*']\n"
+    )
+
+    with patch("skillset.commands.update.clone_or_pull", return_value=source_repo):
+        cmd_update()
+
+    target = env.home / ".claude" / "commands"
+    assert (target / "review-code.md").is_symlink()
+    assert (target / "review-security.md").is_symlink()
+    assert not (target / "tester.md").exists()
+    assert not (target / "do-thing.md").exists()
+
+
+def test_sync_empty_command_list_removes_managed_commands(env: Env, source_repo: Path) -> None:
+    cmd_dir = source_repo / "commands"
+    target = env.home / ".claude" / "commands"
+    target.mkdir()
+    (target / "do-thing.md").symlink_to(cmd_dir / "do-thing.md")
+    yaml_file = env.home / ".claude" / "skillset.yaml"
+    yaml_file.write_text("skills:\n  owner/repo:\n    enabled: ['*']\n    commands: []\n")
+
+    with patch("skillset.commands.update.clone_or_pull", return_value=source_repo):
+        cmd_update()
+
+    assert not (target / "do-thing.md").exists()
+
+
+def test_sync_no_commands_key_links_all_commands(env: Env, source_repo: Path) -> None:
+    yaml_file = env.home / ".claude" / "skillset.yaml"
+    yaml_file.write_text("skills:\n  owner/repo:\n    enabled: ['*']\n")
+
+    with patch("skillset.commands.update.clone_or_pull", return_value=source_repo):
+        cmd_update()
+
+    target = env.home / ".claude" / "commands"
+    assert (target / "do-thing.md").is_symlink()
+
+
 def test_sync_glob_with_disabled_subtraction(
     env: Env, source_repo: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

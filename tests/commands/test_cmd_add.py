@@ -287,6 +287,76 @@ def test_add_agents_with_glob(env: Env, tmp_path: Path) -> None:
     assert entry["agents"] == ["review-*"]
 
 
+def test_add_with_command_filter(env: Env, tmp_path: Path) -> None:
+    repo = tmp_path / "command-source"
+    root = repo / "commands"
+    root.mkdir(parents=True)
+    for name in ("run-ci-here", "deploy"):
+        (root / f"{name}.md").write_text(f"# {name}\n")
+
+    cmd_add(repo=str(repo), commands=["run-ci-here"])
+
+    commands_dir = env.home / ".claude" / "commands"
+    assert (commands_dir / "run-ci-here.md").is_symlink()
+    assert not (commands_dir / "deploy.md").exists()
+
+
+def test_add_commands_with_glob(env: Env, tmp_path: Path) -> None:
+    repo = tmp_path / "command-source"
+    root = repo / "commands"
+    root.mkdir(parents=True)
+    for name in ("review-code", "review-security", "tester"):
+        (root / f"{name}.md").write_text(f"# {name}\n")
+
+    cmd_add(repo=str(repo), commands=["review-%"])
+
+    commands_dir = env.home / ".claude" / "commands"
+    assert (commands_dir / "review-code.md").is_symlink()
+    assert (commands_dir / "review-security.md").is_symlink()
+    assert not (commands_dir / "tester.md").exists()
+
+    from skillset.paths import load_skillset
+
+    entry = next(iter(load_skillset(env.home / ".claude" / "skillset.yaml")["skills"].values()))
+    assert entry["commands"] == ["review-*"]
+
+
+def test_add_command_filter_replaces_existing_policy(env: Env, tmp_path: Path) -> None:
+    repo = tmp_path / "command-source"
+    root = repo / "commands"
+    root.mkdir(parents=True)
+    for name in ("run-ci-here", "deploy"):
+        (root / f"{name}.md").write_text(f"# {name}\n")
+
+    cmd_add(repo=str(repo))
+    cmd_add(repo=str(repo), commands=["run-ci-here"])
+
+    commands_dir = env.home / ".claude" / "commands"
+    assert (commands_dir / "run-ci-here.md").is_symlink()
+    assert not (commands_dir / "deploy.md").exists()
+
+    from skillset.paths import load_skillset
+
+    entry = next(iter(load_skillset(env.home / ".claude" / "skillset.yaml")["skills"].values()))
+    assert entry["commands"] == ["run-ci-here"]
+
+
+def test_add_command_name_not_found(
+    env: Env, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    repo = tmp_path / "command-source"
+    root = repo / "commands"
+    root.mkdir(parents=True)
+    (root / "deploy.md").write_text("# deploy\n")
+
+    cmd_add(repo=str(repo), commands=["missing"])
+
+    output = capsys.readouterr().out
+    assert "Command 'missing' not found" in output
+    commands_dir = env.home / ".claude" / "commands"
+    assert not (commands_dir / "deploy.md").exists()
+
+
 def test_add_agent_filter_replaces_existing_policy(env: Env, tmp_path: Path) -> None:
     repo = tmp_path / "agent-source"
     root = repo / "agents"

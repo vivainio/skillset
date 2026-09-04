@@ -45,6 +45,7 @@ skillset add vivainio/agent-skills -s zaira -s other  # multiple specific skills
 skillset add vivainio/agent-skills -p extra-skills    # discover only within this subtree
 skillset add owner/repo -a reviewer -a test-%         # select agents by name/glob
 skillset add owner/repo -p package/agents -a review-% # -p may be an agents directory
+skillset add owner/repo -c run-ci-here -c deploy-%    # select commands by name/glob
 ```
 
 Agent definitions are installed alongside skills and commands. Markdown files
@@ -69,6 +70,23 @@ With no `agents` key, all discovered agents are installed. `agents: []`
 installs none. Explicit selectors are replacement-based: running `add -a ...`
 again replaces that source's previous agent selection.
 
+`-c`/`--command` filters which commands get linked, the same way `-s` and
+`-a` do for skills and agents (name or `%`-glob, repeatable). Selections
+persist the same way agent selections do:
+
+```yaml
+skills:
+  owner/repo:
+    enabled: ["*"]
+    commands: ["run-ci-here", "deploy-*"]
+```
+
+With no `commands` key, all discovered commands are installed (this is also
+what plain `skillset add owner/repo`, with no `-c`, does). `commands: []`
+installs none. Explicit selectors are replacement-based: running `add -c ...`
+again replaces that source's previous command selection, and `skillset update`
+applies the declared selection on every sync.
+
 You can also pass a full GitHub URL:
 
 ```bash
@@ -83,8 +101,8 @@ skillset add vivainio/agent-skills --fetch
 ```
 
 `--fetch` clones/caches the repo and registers it in `skillset.yaml` with
-`enabled: []` (its current skills go into `disabled`) and `agents: []`, but
-links nothing.
+`enabled: []` (its current skills go into `disabled`), `agents: []`, and
+`commands: []`, but links nothing.
 Useful for pulling a repo into the local cache -- e.g. to search or browse
 its skills later -- without installing any of them yet. A later
 `skillset update` will only prompt about skills added upstream after the

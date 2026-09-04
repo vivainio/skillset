@@ -12,7 +12,7 @@ from skillset.commands.update_repair import (
     remove_redundant_cached_repos,
     report_or_repair_duplicate_sources,
 )
-from skillset.discovery import find_agents, find_skills
+from skillset.discovery import find_agents, find_commands, find_skills
 from skillset.linking import (
     get_copy_source,
     has_glob,
@@ -24,6 +24,7 @@ from skillset.linking import (
     normalize_glob,
     remove_managed,
     remove_unselected_agents,
+    remove_unselected_commands,
 )
 from skillset.manifest import record_install
 from skillset.paths import (
@@ -273,6 +274,7 @@ def _update_dict_entry(
     enabled_raw = value.get("enabled")
     disabled_raw = value.get("disabled", [])
     agents_raw = value.get("agents")
+    commands_raw = value.get("commands")
 
     if enabled_raw is not None and not isinstance(enabled_raw, list):
         print(f"\nSkipping {repo_key}: 'enabled' must be a list")
@@ -282,6 +284,9 @@ def _update_dict_entry(
         return 0
     if agents_raw is not None and not isinstance(agents_raw, list):
         print(f"\nSkipping {repo_key}: 'agents' must be a list")
+        return 0
+    if commands_raw is not None and not isinstance(commands_raw, list):
+        print(f"\nSkipping {repo_key}: 'commands' must be a list")
         return 0
 
     source_dir, repo_dir, owner, repo_name, updated = _resolve_update_source(
@@ -312,6 +317,7 @@ def _update_dict_entry(
         tracked = enabled_expanded | disabled_set | literals
 
     enabled_agents = _enabled_agents(source_dir, agents_raw)
+    enabled_commands = _enabled_commands(source_dir, commands_raw)
 
     total = _update_lists(
         enabled_declared,
@@ -323,6 +329,7 @@ def _update_dict_entry(
         commands_dir,
         agents_dir,
         enabled_agents,
+        enabled_commands,
         use_copy,
         repo_key,
         new_found,
@@ -348,6 +355,14 @@ def _enabled_agents(source_dir: Path, agents_raw: list[str] | None) -> set[str]:
     if agents_raw is None:
         return available
     return _expand_patterns(agents_raw, available) & available
+
+
+def _enabled_commands(source_dir: Path, commands_raw: list[str] | None) -> set[str]:
+    """Expand an entry's flat command selector list. Names are without `.md`."""
+    available = {c.name.removesuffix(".md") for c in find_commands(source_dir)}
+    if commands_raw is None:
+        return available
+    return _expand_patterns(commands_raw, available) & available
 
 
 def _last_commit_info(repo_dir: Path) -> str | None:
@@ -463,6 +478,7 @@ def _update_lists(
     commands_dir: Path,
     agents_dir: Path,
     enabled_agents: set[str],
+    enabled_commands: set[str],
     use_copy: bool,
     repo_key: str,
     new_found: NewSkills,
@@ -492,8 +508,11 @@ def _update_lists(
             elif updated is not None and name in updated:
                 print(f"  ~ {name} (updated)")
 
-    # Commands come along for the ride whenever we link anything from the source.
-    link_commands(source_dir, commands_dir, copy=use_copy)
+    # Commands come along for the ride whenever we link anything from the source,
+    # filtered to the entry's declared command selection (all, by default).
+    only_commands = {f"{name}.md" for name in enabled_commands}
+    link_commands(source_dir, commands_dir, only=only_commands, copy=use_copy)
+    remove_unselected_commands(source_dir, commands_dir, only_commands)
     link_agents(source_dir, agents_dir, only=enabled_agents, copy=use_copy)
     remove_unselected_agents(source_dir, agents_dir, enabled_agents)
 

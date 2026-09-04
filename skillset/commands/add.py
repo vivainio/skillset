@@ -3,6 +3,7 @@
 import fnmatch
 import shutil
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 from skillset.commands._resolve import _resolve_source, derive_toml_key_and_ref
@@ -19,6 +20,7 @@ from skillset.linking import (
     link_skills,
     normalize_glob,
     remove_unselected_agents,
+    remove_unselected_commands,
 )
 from skillset.manifest import record_install
 from skillset.paths import (
@@ -36,6 +38,7 @@ from skillset.paths import (
     load_skillset,
     resolve_editable_source,
     set_skillset_agents,
+    set_skillset_commands,
     set_skillset_ref,
     set_skillset_snapshot,
     update_skillset_skills,
@@ -45,6 +48,7 @@ from skillset.ui import fzf_select, fzf_select_skills, prompt_skill_selection
 
 SkillSelectionResult = tuple[list[str], list[str] | None, list[str] | None]
 AgentSelectionResult = tuple[list[str], list[str] | None]
+CommandSelectionResult = tuple[list[str], list[str] | None]
 
 
 def cmd_add(
@@ -53,6 +57,7 @@ def cmd_add(
     g: bool = False,
     skills: list[str] | None = None,
     agents: list[str] | None = None,
+    commands: list[str] | None = None,
     subpath: str | None = None,
     ref: str | None = None,
     copy: bool = False,
@@ -139,14 +144,21 @@ def cmd_add(
     commands_dir = (
         (skillset_root / ".claude" / "commands") if is_local else get_global_commands_dir()
     )
-    linked_commands = _link_commands_for_add(source_dir, commands_dir, interactive, use_copy)
+    linked_commands, command_selectors = _link_commands_for_add(
+        source_dir, commands_dir, commands, interactive, use_copy
+    )
+    _remove_unselected_for_explicit_filter(
+        remove_unselected_commands, source_dir, commands_dir, linked_commands, command_selectors
+    )
     _print_linked("command", linked_commands, use_copy, commands_dir)
 
     agents_dir = (skillset_root / ".claude" / "agents") if is_local else get_global_agents_dir()
     linked_agents, agent_selectors = _link_agents_for_add(
         source_dir, agents_dir, agents, interactive, use_copy
     )
-    _remove_unselected_for_explicit_filter(source_dir, agents_dir, linked_agents, agent_selectors)
+    _remove_unselected_for_explicit_filter(
+        remove_unselected_agents, source_dir, agents_dir, linked_agents, agent_selectors
+    )
     _print_linked("agent", linked_agents, use_copy, agents_dir)
 
     linked_any = linked_skills or linked_commands or linked_agents
@@ -161,6 +173,7 @@ def cmd_add(
             enabled_list,
             disabled_list,
             agent_selectors,
+            command_selectors,
             is_editable,
             toml_source,
             is_local,
@@ -203,6 +216,7 @@ def _do_fetch(
             subpath,
             [],
             disabled,
+            [],
             [],
             is_editable,
             toml_source,
@@ -330,17 +344,38 @@ def _link_prompted_skills(
 
 
 def _link_commands_for_add(
-    source_dir: Path, commands_dir: Path, interactive: bool, use_copy: bool
-) -> list[str]:
-    """Select and link commands. Returns linked command names."""
+    source_dir: Path,
+    commands_dir: Path,
+    commands: list[str] | None,
+    interactive: bool,
+    use_copy: bool,
+) -> CommandSelectionResult:
+    """Select and link commands, returning linked names and persisted selectors."""
     if interactive:
         available_commands = find_commands(source_dir)
-        if available_commands:
-            cmd_names = sorted(c.name for c in available_commands)
-            selected_cmds = fzf_select(cmd_names, prompt="Commands> ")
-            return link_commands(source_dir, commands_dir, only=set(selected_cmds), copy=use_copy)
-        return []
-    return link_commands(source_dir, commands_dir, copy=use_copy)
+        if not available_commands:
+            return [], None
+        cmd_names = sorted(c.name.removesuffix(".md") for c in available_commands)
+        selected = set(fzf_select(cmd_names, prompt="Commands> "))
+        only = {f"{name}.md" for name in selected}
+        return link_commands(source_dir, commands_dir, only=only, copy=use_copy), sorted(selected)
+
+    if commands is None:
+        return link_commands(source_dir, commands_dir, copy=use_copy), None
+
+    available = {c.name.removesuffix(".md") for c in find_commands(source_dir)}
+    patterns = {normalize_glob(name) for name in commands if has_glob(name)}
+    literals = {name.removesuffix(".md") for name in commands if not has_glob(name)}
+    matched = {name for name in available if any(fnmatch.fnmatch(name, p) for p in patterns)}
+    selected = (literals & available) | matched
+    for name in sorted(literals - available):
+        print(f"  Command '{name}' not found")
+    for pattern in sorted(patterns):
+        if not any(fnmatch.fnmatch(name, pattern) for name in available):
+            print(f"  Pattern '{pattern}' matched no commands")
+    only = {f"{name}.md" for name in selected}
+    enabled = sorted((literals & available) | patterns)
+    return link_commands(source_dir, commands_dir, only=only, copy=use_copy), enabled
 
 
 def _agent_names(source_dir: Path) -> set[str]:
@@ -349,14 +384,15 @@ def _agent_names(source_dir: Path) -> set[str]:
 
 
 def _remove_unselected_for_explicit_filter(
+    remove_fn: Callable[[Path, Path, set[str]], None],
     source_dir: Path,
-    agents_dir: Path,
-    linked_agents: list[str],
+    target_dir: Path,
+    linked: list[str],
     selectors: list[str] | None,
 ) -> None:
-    """Apply replacement semantics only when an agent filter was supplied."""
+    """Apply replacement semantics only when an explicit filter was supplied."""
     if selectors is not None:
-        remove_unselected_agents(source_dir, agents_dir, set(linked_agents))
+        remove_fn(source_dir, target_dir, set(linked))
 
 
 def _link_agents_for_add(
@@ -493,6 +529,7 @@ def _register_in_toml(
     enabled: list[str] | None,
     disabled: list[str] | None,
     agents: list[str] | None,
+    commands: list[str] | None,
     is_editable: bool,
     toml_source: str | None,
     is_local: bool,
@@ -515,6 +552,7 @@ def _register_in_toml(
         enabled=enabled,
         disabled=disabled,
         agents=agents,
+        commands=commands,
         editable=is_editable,
         source=toml_source,
         ref=ref,
@@ -544,6 +582,8 @@ def _register_in_toml(
         updated |= update_skillset_skills(toml_path, toml_key, add_enabled=enabled)
     if agents is not None:
         updated |= set_skillset_agents(toml_path, toml_key, agents)
+    if commands is not None:
+        updated |= set_skillset_commands(toml_path, toml_key, commands)
     if updated:
         print(f"Updated {abbrev(toml_path)}")
 

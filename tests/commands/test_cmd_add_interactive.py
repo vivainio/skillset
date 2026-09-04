@@ -76,7 +76,7 @@ def test_interactive_with_repo_selects_commands(
 ) -> None:
     """With repo + -i, fzf is used to select commands too."""
     with patch("skillset.commands.add.fzf_select_skills", return_value=["skill-a"]):
-        with patch("skillset.commands.add.fzf_select", return_value=["do-thing.md"]):
+        with patch("skillset.commands.add.fzf_select", return_value=["do-thing"]):
             cmd_add(repo=str(source_repo), interactive=True)
 
     commands_dir = env.home / ".claude" / "commands"
