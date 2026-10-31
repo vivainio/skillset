@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from skillset.commands import cmd_get
+from skillset.manifest import load_manifest
 from skillset.paths import abbrev
 from tests.support import Env
 
@@ -28,6 +29,7 @@ def test_get_prints_skill_md_and_resources(env: Env, capsys: pytest.CaptureFixtu
 
     out = capsys.readouterr().out
     assert "# zaira body" in out
+    assert "follow the instructions below" in out
     assert "owner/repo" in out
     assert abbrev(skill_dir.resolve()) in out
     assert abbrev(skill_dir.resolve()).startswith("~")
@@ -80,3 +82,60 @@ def test_get_exact_name_beats_partial(env: Env, capsys: pytest.CaptureFixture[st
     cmd_get(query=["jira"])
 
     assert "# jira body" in capsys.readouterr().out
+
+
+def test_get_with_repo_scopes_to_that_repo(env: Env, capsys: pytest.CaptureFixture[str]) -> None:
+    _cache_skill(env, "owner", "repo", "zaira")
+    _cache_skill(env, "other", "repo", "zaira", "Other zaira")
+
+    cmd_get(query=["other/repo", "zaira"])
+
+    out = capsys.readouterr().out
+    assert "[other/repo]" in out
+    assert "owner/repo" not in out
+
+
+def test_get_with_repo_clones_when_not_cached(
+    env: Env, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fake_clone(owner: str, repo: str, ref: str | None = None) -> Path:
+        return _cache_skill(env, owner, repo, "zaira").parent
+
+    monkeypatch.setattr("skillset.commands.get.clone_or_pull", fake_clone)
+
+    cmd_get(query=["new/repo", "zaira"])
+
+    captured = capsys.readouterr()
+    assert "[new/repo]" in captured.out
+    assert "trial repo" in captured.err
+    assert load_manifest()["new/repo"]["trial"] is True
+
+
+def test_get_with_repo_uses_cache_without_pulling(
+    env: Env, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _cache_skill(env, "owner", "repo", "zaira")
+
+    def boom(*_a: object, **_k: object) -> Path:
+        raise AssertionError("must not hit the network for a cached repo")
+
+    monkeypatch.setattr("skillset.commands.get.clone_or_pull", boom)
+
+    cmd_get(query=["owner/repo", "zaira"])
+
+    assert "# zaira body" in capsys.readouterr().out
+    assert "owner/repo" not in load_manifest()
+
+
+def test_get_with_repo_clone_failure_exits(
+    env: Env, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fail(*_a: object, **_k: object) -> Path:
+        raise RuntimeError("no network")
+
+    monkeypatch.setattr("skillset.commands.get.clone_or_pull", fail)
+
+    with pytest.raises(SystemExit) as exc:
+        cmd_get(query=["new/repo", "zaira"])
+    assert exc.value.code == 1
+    assert "Could not fetch new/repo" in capsys.readouterr().err

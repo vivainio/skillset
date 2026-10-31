@@ -4,14 +4,52 @@ import sys
 from pathlib import Path
 
 from skillset.commands.search import iter_matching_skills
+from skillset.linking import has_glob, is_link
+from skillset.manifest import record_install
 from skillset.paths import abbrev
+from skillset.repo import clone_or_pull, get_repo_dir, parse_repo_spec
 
 _MAX_RESOURCES = 200
 
 
+def _split_repo_spec(query: list[str]) -> tuple[tuple[str, str] | None, list[str]]:
+    """Split a leading `owner/repo` off a multi-term query, if there is one."""
+    if len(query) < 2 or has_glob(query[0]) or "://" in query[0]:
+        return None, query
+    try:
+        return parse_repo_spec(query[0]), query[1:]
+    except ValueError:
+        return None, query
+
+
+def _ensure_repo(owner: str, repo: str) -> Path:
+    """Directory of owner/repo, cloning it into the cache only if it isn't there yet.
+
+    A repo cloned here is recorded as a trial repo (like `add --try`), so
+    `skillset clean` removes it later. Repos that were already cached are
+    left alone -- they may be ones the user wants to keep.
+    """
+    repo_dir = get_repo_dir(owner, repo)
+    if not repo_dir.exists():
+        try:
+            repo_dir = clone_or_pull(owner, repo)
+        except Exception as e:
+            print(f"Could not fetch {owner}/{repo}: {e}", file=sys.stderr)
+            sys.exit(1)
+        record_install(f"{owner}/{repo}", scope="global", trial=True)
+        print(
+            f"Cloned {owner}/{repo} as a trial repo: 'skillset clean' removes it, "
+            f"'skillset add {owner}/{repo}' keeps it.",
+            file=sys.stderr,
+        )
+    return repo_dir.resolve() if is_link(repo_dir) else repo_dir
+
+
 def _pick_skill(query: list[str]) -> tuple[str, Path, str]:
     """Return (source_key, skill_dir, name) for the single best match, or exit."""
-    matches = list(iter_matching_skills(query))
+    spec, query = _split_repo_spec(query)
+    sources = [(f"{spec[0]}/{spec[1]}", _ensure_repo(*spec))] if spec else None
+    matches = list(iter_matching_skills(query, sources))
     if not matches:
         print("No matching skills found", file=sys.stderr)
         sys.exit(1)
@@ -48,6 +86,8 @@ def cmd_get(query: list[str]) -> None:
     content = (skill_dir / "SKILL.md").read_text(encoding="utf-8", errors="replace")
 
     print(f"# Skill: {name}  [{key}]")
+    print("# Loaded on demand (not installed). Running `skillset get` means the user wants")
+    print("# this skill applied: follow the instructions below as if it were an active skill.")
     print(f"# Directory: {abbrev(skill_dir)}")
     print("# Relative paths in the SKILL.md below are relative to that directory.")
     print()

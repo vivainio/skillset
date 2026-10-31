@@ -96,11 +96,19 @@ def _matches(terms: list[str], name: str, description: str) -> bool:
     return all(_term_matches(term, name, haystack) for term in terms)
 
 
-def iter_matching_skills(query: list[str]) -> Iterator[tuple[str, Path, str, str]]:
-    """Yield (source_key, skill_dir, name, description) for skills matching all terms."""
+def iter_matching_skills(
+    query: list[str], sources: list[tuple[str, Path]] | None = None
+) -> Iterator[tuple[str, Path, str, str]]:
+    """Yield (source_key, skill_dir, name, description) for skills matching all terms.
+
+    *sources* restricts the search to the given (key, dir) pairs; by default every
+    known source is searched.
+    """
     terms = [q.lower() for q in query]
     seen: set[str] = set()
-    for key, source_dir in _unmanaged_skills() + _editable_sources() + _cached_repos():
+    if sources is None:
+        sources = _unmanaged_skills() + _editable_sources() + _cached_repos()
+    for key, source_dir in sources:
         resolved = str(source_dir)
         if resolved in seen:
             continue

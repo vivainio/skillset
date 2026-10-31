@@ -192,7 +192,8 @@ def get(
     query: Annotated[
         list[str],
         typer.Argument(
-            help="Skill name or search term(s); an exact name wins when several skills match"
+            help="[owner/repo] skill name or search term(s); an exact name wins when several "
+            "match. With owner/repo the repo is cloned into the cache if needed"
         ),
     ],
 ) -> None:
