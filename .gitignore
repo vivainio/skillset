@@ -37,3 +37,5 @@ htmlcov/
 
 skillset.toml
 settings.local.json
+# Docs build
+site/

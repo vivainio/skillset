@@ -42,6 +42,7 @@ skillset search jira                    # name/description contains "jira"
 skillset search jenkins build           # all terms must match (AND)
 skillset search jira-%                  # glob: name starting with "jira-"
 skillset search %config%                # glob: "config" anywhere in name or description
+skillset get zaira                      # print SKILL.md + resource paths WITHOUT installing (saves context)
 
 # Remove skills
 skillset remove zaira           # remove from detected scope

@@ -208,6 +208,15 @@ any editable sources registered in the global `skillset.yaml`. It's local and
 offline -- no registry lookup -- so it only finds skills you've fetched
 before.
 
+### Read a skill without installing it
+
+```bash
+skillset get zaira      # print SKILL.md plus absolute paths to its nested resources
+```
+
+Takes the same terms as `search`. Nothing is linked, so the skill costs no
+context in future sessions. See the [docs](https://vivainio.github.io/skillset/searching/).
+
 ### List installed skills
 
 ```bash

@@ -7,6 +7,7 @@ import typer
 from skillset.commands import (
     cmd_add,
     cmd_clean,
+    cmd_get,
     cmd_init,
     cmd_install_skills,
     cmd_list,
@@ -184,6 +185,19 @@ def search(
 ) -> None:
     """Search skill names/descriptions across cached repos and editable sources."""
     cmd_search(query=query)
+
+
+@app.command()
+def get(
+    query: Annotated[
+        list[str],
+        typer.Argument(
+            help="Skill name or search term(s); an exact name wins when several skills match"
+        ),
+    ],
+) -> None:
+    """Print a skill's SKILL.md and nested resource paths without installing it."""
+    cmd_get(query=query)
 
 
 @app.command()

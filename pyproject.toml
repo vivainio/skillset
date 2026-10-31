@@ -19,6 +19,7 @@ package = true
 
 [dependency-groups]
 dev = ["pytest>=8.0", "pytest-cov>=6.0", "ruff>=0.8", "ty>=0.0.60"]
+docs = ["zensical"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,6 +1,7 @@
 """Command handler for searching skills across cached and editable sources."""
 
 import fnmatch
+from collections.abc import Iterator
 from pathlib import Path
 
 from skillset.discovery import find_skills, parse_skill_metadata
@@ -95,12 +96,10 @@ def _matches(terms: list[str], name: str, description: str) -> bool:
     return all(_term_matches(term, name, haystack) for term in terms)
 
 
-def cmd_search(query: list[str]) -> None:
-    """Search skill names/descriptions across cached repos and editable sources."""
+def iter_matching_skills(query: list[str]) -> Iterator[tuple[str, Path, str, str]]:
+    """Yield (source_key, skill_dir, name, description) for skills matching all terms."""
     terms = [q.lower() for q in query]
     seen: set[str] = set()
-    results: dict[str, list[tuple[str, str]]] = {}
-
     for key, source_dir in _unmanaged_skills() + _editable_sources() + _cached_repos():
         resolved = str(source_dir)
         if resolved in seen:
@@ -109,7 +108,14 @@ def cmd_search(query: list[str]) -> None:
         for skill_dir in find_skills(source_dir):
             name, description = parse_skill_metadata(skill_dir)
             if _matches(terms, name, description):
-                results.setdefault(key, []).append((name, description))
+                yield key, skill_dir, name, description
+
+
+def cmd_search(query: list[str]) -> None:
+    """Search skill names/descriptions across cached repos and editable sources."""
+    results: dict[str, list[tuple[str, str]]] = {}
+    for key, _skill_dir, name, description in iter_matching_skills(query):
+        results.setdefault(key, []).append((name, description))
 
     if not results:
         print("No matching skills found")
@@ -123,4 +129,7 @@ def cmd_search(query: list[str]) -> None:
             snippet = description[:100] + ("..." if len(description) > 100 else "")
             print(f"  {name} -- {snippet}" if snippet else f"  {name}")
 
-    print(f"\n{total} skill(s) found. Install with: skillset add <repo> -s <skill>")
+    print(
+        f"\n{total} skill(s) found. Read one without installing: skillset get <skill>. "
+        "Install with: skillset add <repo> -s <skill>"
+    )
