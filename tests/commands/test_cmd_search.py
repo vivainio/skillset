@@ -128,6 +128,27 @@ def test_search_editable_source(
     assert "zaira" in output
 
 
+def test_search_editable_and_cached_same_repo_listed_once(
+    env: Env, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    _cache_repo(env, "my", "editable", {"zaira": "Access Jira tickets offline"})
+    editable_repo = tmp_path / "editable_repo"
+    skill_dir = editable_repo / "zaira"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "SKILL.md").write_text(
+        "---\nname: zaira\ndescription: Access Jira tickets offline\n---\n# zaira\n"
+    )
+    save_skillset(
+        env.home / ".claude" / "skillset.yaml",
+        {"skills": {"my/editable": {"editable": True, "source": str(editable_repo)}}},
+    )
+
+    cmd_search(query=["jira"])
+    output = capsys.readouterr().out
+    assert output.count("zaira --") == 1
+    assert "1 skill(s) found" in output
+
+
 def test_search_installed_unmanaged_skill(env: Env, capsys: pytest.CaptureFixture[str]) -> None:
     skill_dir = env.home / ".claude" / "skills" / "personal"
     skill_dir.mkdir(parents=True)

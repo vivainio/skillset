@@ -106,6 +106,7 @@ def iter_matching_skills(
     """
     terms = [q.lower() for q in query]
     seen: set[str] = set()
+    seen_skills: set[tuple[str, str]] = set()
     if sources is None:
         sources = _unmanaged_skills() + _editable_sources() + _cached_repos()
     for key, source_dir in sources:
@@ -115,8 +116,12 @@ def iter_matching_skills(
         seen.add(resolved)
         for skill_dir in find_skills(source_dir):
             name, description = parse_skill_metadata(skill_dir)
-            if _matches(terms, name, description):
-                yield key, skill_dir, name, description
+            # An editable checkout and the cached clone of the same repo share a
+            # key; the earlier (editable) source wins so skills aren't listed twice.
+            if (key, name) in seen_skills or not _matches(terms, name, description):
+                continue
+            seen_skills.add((key, name))
+            yield key, skill_dir, name, description
 
 
 def cmd_search(query: list[str]) -> None:
