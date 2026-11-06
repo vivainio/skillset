@@ -1,7 +1,7 @@
 # Finding and reading skills
 
 Both commands are local and offline: they look at every repo already in the cache
-(`skillset add ... --fetch` is a good way to get one there), editable sources registered
+(`skillset fetch ...` is a good way to get one there), editable sources registered
 in the global `skillset.yaml`, and unmanaged skills.
 
 ## search
@@ -69,7 +69,7 @@ as is (no network); otherwise it is cloned, and recorded as a **trial repo**, ex
 like `skillset add --try`:
 
 - `skillset clean` removes it again,
-- `skillset add owner/repo -s zaira` keeps it and installs the skill.
+- `skillset fetch owner/repo` keeps it in the cache; `skillset add owner/repo -s zaira` keeps it and installs the skill.
 
 A repo that was already cached is never marked as trial, so `clean` cannot delete a
 clone you meant to keep. Without the `owner/repo` prefix, `get` only reads sources that

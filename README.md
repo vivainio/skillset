@@ -97,10 +97,10 @@ skillset add https://github.com/vivainio/agent-skills/tree/main/extra-skills
 ### Fetch a repo without linking artifacts
 
 ```bash
-skillset add vivainio/agent-skills --fetch
+skillset fetch vivainio/agent-skills
 ```
 
-`--fetch` clones/caches the repo and registers it in `skillset.yaml` with
+`fetch` clones/caches the repo and registers it in `skillset.yaml` with
 `enabled: []` (its current skills go into `disabled`), `agents: []`, and
 `commands: []`, but links nothing.
 Useful for pulling a repo into the local cache -- e.g. to search or browse
@@ -203,7 +203,7 @@ A term containing `%` is matched as a glob against the skill name and against
 the full name+description text; plain terms fall back to a substring match.
 
 Searches skill names and descriptions across every repo already cloned into
-the cache (`skillset add ... --fetch` is a good way to get one in there) plus
+the cache (`skillset fetch ...` is a good way to get one in there) plus
 any editable sources registered in the global `skillset.yaml`. It's local and
 offline -- no registry lookup -- so it only finds skills you've fetched
 before.

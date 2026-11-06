@@ -35,7 +35,7 @@ skillset add vivainio/agent-skills --try                # install as trial (see 
 skillset add vivainio/agent-skills --ref v1.2.0         # pin to a branch/tag/commit
 skillset add vivainio/agent-skills -s zaira --snapshot  # freeze the skill at current HEAD, 'update' skips it
 skillset add vivainio/agent-skills -s zaira --unsnapshot  # convert a snapshot back to a live link
-skillset add owner/repo --fetch                         # clone/cache only, register with no skills enabled -- link nothing yet
+skillset fetch owner/repo                               # clone/cache only, register with no skills enabled -- link nothing yet
 
 # Search cached, editable, installed unmanaged, and saved unmanaged skills (local, offline)
 skillset search jira                    # name/description contains "jira"
@@ -138,4 +138,4 @@ links:
   `~/Library/Application Support/skillset/repos/` on macOS, and
   `%LOCALAPPDATA%\skillset\repos` on Windows. Legacy
   `~/.cache/skillset/repos/` clones remain supported.
-- `--fetch` is the way to get a repo into the cache (and registered in `skillset.yaml` with nothing enabled) purely so `skillset search` can find its skills later, without installing anything yet.
+- `skillset fetch owner/repo` is the way to get a repo into the cache (and registered in `skillset.yaml` with nothing enabled) purely so `skillset search` can find its skills later, without installing anything yet.

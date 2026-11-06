@@ -47,7 +47,7 @@ previous selection.
 ## Fetch without linking
 
 ```bash
-skillset add vivainio/agent-skills --fetch
+skillset fetch vivainio/agent-skills
 ```
 
 Clones and caches the repo and registers it with `enabled: []`, `agents: []` and

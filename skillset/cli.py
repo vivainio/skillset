@@ -7,6 +7,7 @@ import typer
 from skillset.commands import (
     cmd_add,
     cmd_clean,
+    cmd_fetch,
     cmd_get,
     cmd_init,
     cmd_install_skills,
@@ -128,13 +129,6 @@ def add(
             help="Drop snapshot/ref pin and switch back to live links",
         ),
     ] = False,
-    fetch: Annotated[
-        bool,
-        typer.Option(
-            "--fetch",
-            help="Clone/cache the repo and register it with no skills enabled -- link nothing now",
-        ),
-    ] = False,
 ) -> None:
     """Add skills from a GitHub repo. Installs locally if skillset.yaml is found in path."""
     cmd_add(
@@ -152,8 +146,27 @@ def add(
         force=force,
         snapshot=snapshot,
         unsnapshot=unsnapshot,
-        fetch=fetch,
     )
+
+
+@app.command()
+def fetch(
+    repo: Annotated[str, typer.Argument(help="Repo in owner/repo format, URL, or local path")],
+    global_: Annotated[
+        bool,
+        typer.Option("-g", "--global", help="Register in the global skillset.yaml"),
+    ] = False,
+    subpath: Annotated[
+        str | None,
+        typer.Option("-p", "--path", help="Subdirectory within the repo to use as root"),
+    ] = None,
+    ref: Annotated[
+        str | None,
+        typer.Option("--ref", help="Git ref (branch, tag, or commit) to check out"),
+    ] = None,
+) -> None:
+    """Clone/cache a repo and register it with nothing enabled -- for search and get."""
+    cmd_fetch(repo=repo, g=global_, subpath=subpath, ref=ref)
 
 
 @app.command("install-skills")

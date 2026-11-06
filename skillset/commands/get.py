@@ -39,7 +39,7 @@ def _ensure_repo(owner: str, repo: str) -> Path:
         record_install(f"{owner}/{repo}", scope="global", trial=True)
         print(
             f"Cloned {owner}/{repo} as a trial repo: 'skillset clean' removes it, "
-            f"'skillset add {owner}/{repo}' keeps it.",
+            f"'skillset fetch {owner}/{repo}' keeps it.",
             file=sys.stderr,
         )
     return repo_dir.resolve() if is_link(repo_dir) else repo_dir
